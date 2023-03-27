@@ -16,7 +16,8 @@ DEFINES += _USE_MATH_DEFINES
 
 win32-msvc: DEFINES += NOMINMAX
 
-LIBS += -lGLU
+unix:LIBS += -lGLU
+win32:LIBS += "C:/Program Files/vcpkg/packages/glew_x64-windows/lib/glew32.lib"
 
 SOURCES += \
     ../../../vcglib/wrap/system/qgetopt.cpp \

@@ -18,7 +18,7 @@ for more details.
 #ifndef NX_GLNXSVIEW_H
 #define NX_GLNXSVIEW_H
 
-#include <GL/glew.h>
+#include <glew-2.1.0/include/GL/glew.h>
 #include <iostream>
 #include <QGLWidget>
 #include <QDebug>

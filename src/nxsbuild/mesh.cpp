@@ -280,7 +280,6 @@ quint32 Mesh::serializedSize(const nx::Signature &sig) {
 
 void Mesh:: serialize(uchar *buffer, nx::Signature &sig, std::vector<nx::Patch> &patches) {
 
-
 	quint32 current_node = 0;
 	//find patches and triangle (splat) offsets
 	if(sig.face.hasIndex()) {
@@ -316,7 +315,6 @@ void Mesh:: serialize(uchar *buffer, nx::Signature &sig, std::vector<nx::Patch> 
 		}
 	}
 
-
 	nx::Patch patch;
 	patch.node = current_node;
 	if(sig.face.hasIndex()) {
@@ -338,6 +336,13 @@ void Mesh:: serialize(uchar *buffer, nx::Signature &sig, std::vector<nx::Patch> 
 
 	//assert(!sig.vertex.hasTextures());
 
+    if(sig.vertex.hasColors()) {
+        vcg::Color4b *cstart = (vcg::Color4b *)buffer;
+        for(uint i = 0; i < vert.size(); i++)
+            cstart[i] = vert[i].C();
+        buffer += vert.size() * sizeof(vcg::Color4b);
+    }
+
 	if(sig.vertex.hasNormals()) {
 		vcg::Point3s *nstart = (vcg::Point3s *)buffer;
 		for(uint i = 0; i < vert.size(); i++) {
@@ -348,13 +353,6 @@ void Mesh:: serialize(uchar *buffer, nx::Signature &sig, std::vector<nx::Patch> 
 				ns[k] = (short)(nf[k]*32766);
 		}
 		buffer += vert.size() * sizeof(vcg::Point3s);
-	}
-
-	if(sig.vertex.hasColors()) {
-		vcg::Color4b *cstart = (vcg::Color4b *)buffer;
-		for(uint i = 0; i < vert.size(); i++)
-			cstart[i] = vert[i].C();
-		buffer += vert.size() * sizeof(vcg::Color4b);
 	}
 
 	quint16 *faces = (quint16 *)buffer;

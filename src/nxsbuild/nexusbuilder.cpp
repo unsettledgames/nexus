@@ -36,6 +36,9 @@ for more details.
 #include <vcg/space/rect_packer.h>
 
 #include <iostream>
+
+#define NXS_FORMAT_VERSION  3
+
 using namespace std;
 
 using namespace nx;
@@ -107,7 +110,7 @@ NexusBuilder::NexusBuilder(quint32 components): chunks("cache_chunks"), scaling(
 	if(components & TEXTURES)
 		signature.vertex.setComponent(FaceElement::TEX, Attribute(Attribute::FLOAT, 2));
 
-	header.version = 2;
+    header.version = NXS_FORMAT_VERSION;
 	header.signature = signature;
 	header.nvert = header.nface = header.n_nodes = header.n_patches = header.n_textures = 0;
 
@@ -115,7 +118,7 @@ NexusBuilder::NexusBuilder(quint32 components): chunks("cache_chunks"), scaling(
 }
 
 NexusBuilder::NexusBuilder(Signature &signature): chunks("cache_chunks"), scaling(0.5) {
-	header.version = 2;
+    header.version = NXS_FORMAT_VERSION;
 	header.signature = signature;
 	header.nvert = header.nface = header.n_nodes = header.n_patches = header.n_textures = 0;
 }
@@ -872,7 +875,7 @@ void NexusBuilder::save(QString filename) {
 	header.n_patches = patches.size();
 
 	header.n_textures = textures.size();
-	header.version = 2;
+    header.version = NXS_FORMAT_VERSION;
 
 	//find roots and adjust error
 	uint32_t nroots = header.n_nodes;
@@ -1085,7 +1088,9 @@ void NexusBuilder::appendBorderVertices(uint32_t origin, uint32_t destination, s
 	uchar *buffer = chunks.getChunk(chunk, origin != destination);
 
 	vcg::Point3f *point = (vcg::Point3f *)buffer;
-	int size = sizeof(vcg::Point3f) + header.signature.vertex.hasTextures()*sizeof(vcg::Point2f);
+    int size = sizeof(vcg::Point3f) +
+            header.signature.vertex.hasTextures()*sizeof(vcg::Point2f) +
+            header.signature.vertex.hasColors() * sizeof(vcg::Color4b);
 	vcg::Point3s *normal = (vcg::Point3s *)(buffer + size * node.nvert);
 	uint16_t *face = (uint16_t *)(buffer + header.signature.vertex.size()*node.nvert);
 

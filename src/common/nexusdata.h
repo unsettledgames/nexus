@@ -41,20 +41,20 @@ public:
 		m += nvert * sizeof(vcg::Point3f);
 		return (vcg::Point2f *)m;
 	}
+    vcg::Color4b *colors(Signature &sig, uint32_t nvert) {
+        char *m = memory;
+        m += nvert * sizeof(vcg::Point3f);
+        if(sig.vertex.hasTextures())
+            m += nvert * sizeof(vcg::Point2f);
+        return (vcg::Color4b *)m;
+    }
 	vcg::Point3s *normals(Signature &sig, uint32_t nvert) {
-		char *m = memory + nvert * sizeof(vcg::Point3f);
-		if(sig.vertex.hasTextures())
+        char *m = memory + nvert * sizeof(vcg::Point3f);
+        if(sig.vertex.hasTextures())
 			m += nvert * sizeof(vcg::Point2f);
+        if(sig.vertex.hasColors())
+            m += nvert * sizeof(vcg::Color4b);
 		return (vcg::Point3s *)m;
-	}
-	vcg::Color4b *colors(Signature &sig, uint32_t nvert) {
-		char *m = memory;
-		m += nvert * sizeof(vcg::Point3f);
-		if(sig.vertex.hasTextures())
-			m += nvert * sizeof(vcg::Point2f);
-		if(sig.vertex.hasNormals())
-			m += nvert * sizeof(vcg::Point3s);
-		return (vcg::Color4b *)m;
 	}
 
 	uint16_t *faces(Signature &sig, uint32_t nvert) {

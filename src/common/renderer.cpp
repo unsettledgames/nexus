@@ -324,15 +324,29 @@ void Renderer::renderSelected(Nexus *nexus) {
 		if(sig.vertex.hasTextures())
 			start += node.nvert * sig.vertex.attributes[VertexElement::TEX].size();
 		
-		if(draw_normals)
-			glNormalPointer(GL_SHORT, 0, (void *)start);
-		if(sig.vertex.hasNormals())
-			start += node.nvert*sig.vertex.attributes[VertexElement::NORM].size();
-		
-		if(draw_colors)
-			glColorPointer(4, GL_UNSIGNED_BYTE, 0, (void *)start);
-		if(sig.vertex.hasColors())
-			start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
+        if (nexus->header.version <= 2) {
+            if(draw_normals)
+                glNormalPointer(GL_SHORT, 0, (void *)start);
+            if(sig.vertex.hasNormals())
+                start += node.nvert*sig.vertex.attributes[VertexElement::NORM].size();
+
+            if(draw_colors)
+                glColorPointer(4, GL_UNSIGNED_BYTE, 0, (void *)start);
+            if(sig.vertex.hasColors())
+                start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
+        }
+        else {
+            std::cout << "Version 3" << std::endl;
+            if(draw_colors)
+                glColorPointer(4, GL_UNSIGNED_BYTE, 0, (void *)start);
+            if(sig.vertex.hasColors())
+                start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
+
+            if(draw_normals)
+                glNormalPointer(GL_SHORT, 0, (void *)start);
+            if(sig.vertex.hasNormals())
+                start += node.nvert*sig.vertex.attributes[VertexElement::NORM].size();
+        }
 		
 		
 #endif

@@ -29,6 +29,8 @@ Nexus = function() {
 var meco;
 var corto;
 
+var version = 0;
+
 var scripts = document.getElementsByTagName('script');
 var i, j, k;
 var path;
@@ -303,7 +305,7 @@ var drawBudget    = 5*(1<<20);
 
 Mesh = function() {
 	var t = this;
-	t.useIndexedDb = true;
+	t.useIndexedDb = false;
 	t.onLoad = null;
 	t.reqAttempt = 0;
 	t.georeq = {}
@@ -342,6 +344,7 @@ Mesh.prototype = {
 					if(mesh.reqAttempt < maxReqAttempt) mesh.open(mesh.url + '?' + Math.random()); // BLINK ENGINE CACHE BUG PATCH
 					return;
 				}
+				version = header.version;
 				mesh.reqAttempt = 0;
 				for(i in header)
 					mesh[i] = header[i];
@@ -1333,9 +1336,19 @@ function readyNode(node) {
 			vertices.set(uv, off);
 			off += nv*8;
 		}
+		
 		if(m.vertex.normal && m.vertex.color) {
-			var no = view.subarray(off, off + nv*6);
-			var co = view.subarray(off + nv*6, off + nv*6 + nv*4);
+			var co, no;
+
+			if (version <= 2) {
+				no = view.subarray(off + nv*6, off + nv*6);
+				co = view.subarray(off + nv*6, off + nv*6 + nv*4);
+			}
+			else {
+				co = view.subarray(off, off + nv*4);
+				no = view.subarray(off + nv*4, off + nv*4 + nv*6);
+			}
+
 			vertices.set(co, off);
 			vertices.set(no, off + nv*4);
 		}

@@ -47,3 +47,9 @@ _deps
 *.exe
 *.out
 *.app
+
+bin
+*.idx
+build*/
+html/models
+*.user

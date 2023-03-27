@@ -424,19 +424,7 @@ void TMesh::serialize(uchar *buffer, nx::Signature &sig, std::vector<nx::Patch> 
 			tstart[i] = vert[i].T().P();
 		}
 		buffer += vert.size() * sizeof(vcg::Point2f);
-	}
-
-	if(sig.vertex.hasNormals()) {
-		vcg::Point3s *nstart = (vcg::Point3s *)buffer;
-		for(int i = 0; i < vn; i++) {
-			vcg::Point3f nf = vert[i].N();
-			nf.Normalize();
-			vcg::Point3s &ns = nstart[i];
-			for(int k = 0; k < 3; k++)
-				ns[k] = (short)(nf[k]*32766);
-		}
-		buffer += vert.size() * sizeof(vcg::Point3s);
-	}
+    }
 
 	if(sig.vertex.hasColors()) {
 		vcg::Color4b *cstart = (vcg::Color4b *)buffer;
@@ -444,6 +432,18 @@ void TMesh::serialize(uchar *buffer, nx::Signature &sig, std::vector<nx::Patch> 
 			cstart[i] = vert[i].C();
 		buffer += vert.size() * sizeof(vcg::Color4b);
 	}
+
+    if(sig.vertex.hasNormals()) {
+        vcg::Point3s *nstart = (vcg::Point3s *)buffer;
+        for(int i = 0; i < vn; i++) {
+            vcg::Point3f nf = vert[i].N();
+            nf.Normalize();
+            vcg::Point3s &ns = nstart[i];
+            for(int k = 0; k < 3; k++)
+                ns[k] = (short)(nf[k]*32766);
+        }
+        buffer += vert.size() * sizeof(vcg::Point3s);
+    }
 
 	quint16 *faces = (quint16 *)buffer;
 	for(int i = 0; i < fn; i++) {

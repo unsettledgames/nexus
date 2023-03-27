@@ -24,7 +24,7 @@ for more details.
 
 #else
 
-#include <GL/glew.h>
+#include <glew-2.1.0/include/GL/glew.h>
 
 #endif
 

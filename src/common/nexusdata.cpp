@@ -209,20 +209,20 @@ uint64_t NexusData::loadRam(uint32_t n) {
 				coords[i] = d.coords()[order[i]];
 			memcpy(d.coords(), &*coords.begin(), sizeof(Point3f)*node.nvert);
 
+               if(sign.vertex.hasColors()) {
+                    Color4b *c = d.colors(sign, node.nvert);
+                    std::vector<Color4b> colors(node.nvert);
+                    for(int i =0; i < node.nvert; i++)
+                        colors[i] = c[order[i]];
+                    memcpy(c, &*colors.begin(), sizeof(Color4b)*node.nvert);
+                }
+
 			if(sign.vertex.hasNormals()) {
 				Point3s *n = d.normals(sign, node.nvert);
 				std::vector<Point3s> normals(node.nvert);
 				for(int i =0; i < node.nvert; i++)
 					normals[i] = n[order[i]];
 				memcpy(n, &*normals.begin(), sizeof(Point3s)*node.nvert);
-			}
-
-			if(sign.vertex.hasColors()) {
-				Color4b *c = d.colors(sign, node.nvert);
-				std::vector<Color4b> colors(node.nvert);
-				for(int i =0; i < node.nvert; i++)
-					colors[i] = c[order[i]];
-				memcpy(c, &*colors.begin(), sizeof(Color4b)*node.nvert);
 			}
 		}
 	}

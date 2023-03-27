@@ -16,7 +16,8 @@ INCLUDEPATH += \
     ../../../vcglib/eigenlib
 
 win32:INCLUDEPATH += ../../../glew/include ../../../corto/include
-win32:LIBS += opengl32.lib GLU32.lib ../../../glew/lib/glew32.lib ../../../corto/lib/corto.lib
+win32:LIBS += opengl32.lib GLU32.lib "C:/Program Files/vcpkg/packages/glew_x64-windows/lib/glew32.lib" ../../../corto/Build/Release/corto.lib \
+            "C:\Users\nicol\Desktop\Lavoro\Repo\corto\Build\deps\lz4\build\cmake\Release\lz4.lib"
 
 unix:INCLUDEPATH += /usr/local/lib
 unix:LIBS += -lGLEW -lGLU -lcorto
