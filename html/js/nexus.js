@@ -26,10 +26,7 @@ Nexus = function() {
 
 /* WORKER INITIALIZED ONCE */
 
-var meco;
 var corto;
-
-var version = 0;
 
 var scripts = document.getElementsByTagName('script');
 var i, j, k;
@@ -45,37 +42,6 @@ for(i = 0; i < scripts.length; i++) {
 			break;
 		}
 	}
-}
-
-var meco = null;
-function loadMeco() {
-
-	meco = new Worker(path.replace('nexus.js', 'meco.js'));
-
-	meco.onerror = function(e) { console.log(e); }
-	meco.requests = {};
-	meco.count = 0;
-	meco.postRequest = function(sig, node, patches) {
-		var signature = {
-			texcoords: sig.texcoords ? 1 : 0,
-			colors   : sig.colors    ? 1 : 0,
-			normals  : sig.normals   ? 1 : 0,
-			indices  : sig.indices   ? 1 : 0
-		};
-		meco.postMessage({
-			signature:signature,
-			node:{ nface: node.nface, nvert: node.nvert, buffer:node.buffer, request:this.count},
-			patches:patches
-		});
-		node.buffer = null;
-		this.requests[this.count++] = node;
-	};
-	meco.onmessage = function(e) {
-		var node = this.requests[e.data.request];
-		delete this.requests[e.data.request];
-		node.buffer = e.data.buffer;
-		readyNode(node);
-	};
 }
 
 var corto = null;
@@ -344,16 +310,16 @@ Mesh.prototype = {
 					if(mesh.reqAttempt < maxReqAttempt) mesh.open(mesh.url + '?' + Math.random()); // BLINK ENGINE CACHE BUG PATCH
 					return;
 				}
-				version = header.version;
+
+				mesh.version = header.version;
 				mesh.reqAttempt = 0;
 				for(i in header)
 					mesh[i] = header[i];
 				mesh.vertex = mesh.signature.vertex;
 				mesh.face = mesh.signature.face;
 				mesh.renderMode = mesh.face.index?["FILL", "POINT"]:["POINT"];
-				mesh.compressed = (mesh.signature.flags & (2 | 4)); //meco or corto
+				mesh.compressed = (mesh.signature.flags & 4); //corto
 				mesh.deepzoom = (mesh.signature.flags & 8);
-				mesh.meco = (mesh.signature.flags & 2);
 				mesh.corto = (mesh.signature.flags & 4);
 				if(mesh.deepzoom)
 					mesh.baseurl = url.substr(0, url.length -4) + '_files/';
@@ -1226,14 +1192,7 @@ function loadNodeGeometry(request, context, node) {
 
 	if(!m.compressed)
 		readyNode(node);
-	else if(m.meco) {
-		var sig = { texcoords: m.vertex.texCoord, normals:m.vertex.normal, colors:m.vertex.color, indices: m.face.index }
-		var patches = [];
-		for(var k = m.nfirstpatch[n]; k < m.nfirstpatch[n+1]; k++)
-			patches.push(m.patches[k*3+1]);
-		if(!meco) loadMeco();
-		meco.postRequest(sig, node, patches);
-	} else {
+	else {
 		if(!corto) loadCorto();
 		corto.postRequest(node);
 	}
@@ -1340,7 +1299,7 @@ function readyNode(node) {
 		if(m.vertex.normal && m.vertex.color) {
 			var co, no;
 
-			if (version <= 2) {
+			if (m.version <= 2) {
 				no = view.subarray(off + nv*6, off + nv*6);
 				co = view.subarray(off + nv*6, off + nv*6 + nv*4);
 			}

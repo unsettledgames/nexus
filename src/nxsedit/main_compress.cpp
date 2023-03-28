@@ -68,8 +68,7 @@ int main(int argc, char *argv[]) {
 	//extraction options
 	opt.addOption('o', "nexus file", "filename of the nexus output file", &output);
 
-	//compression and quantization options
-	opt.addOption('Z', "compression library", "pick among compression libs [corto, meco], default corto", &compresslib);
+    //compression and quantization options
 	opt.addOption('v', "vertex quantization", "absolute side of quantization grid, default 0.0 (uses quantization factor, instead)", &coord_step);
 	opt.addOption('V', "vertex bits", "number of bits in vertex coordinates when compressing default, 0 (uses quantization factor, instead)", &position_bits);
 	opt.addOption('Q', "quantization factor", "quantization as a factor of error, default 0.1", &error_q);
@@ -137,10 +136,8 @@ int main(int argc, char *argv[]) {
 
 			Signature signature = nexus.header.signature;
 			if(compress) {
-				signature.flags &= ~(Signature::MECO | Signature::CORTO);
-				if(compresslib == "meco")
-					signature.flags |= Signature::MECO;
-				else if(compresslib == "corto")
+                signature.flags &= ~(Signature::CORTO);
+                if(compresslib == "corto")
 					signature.flags |= Signature::CORTO;
 				else {
 					cerr << "Unknown compression method: " << qPrintable(compresslib) << endl;

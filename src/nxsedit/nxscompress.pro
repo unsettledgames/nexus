@@ -1,4 +1,4 @@
-QT       += core gui
+QT       += core gui widgets
 
 TARGET   = nxscompress
 CONFIG   += console
@@ -14,8 +14,9 @@ INCLUDEPATH += \
     ../../../vcglib \
     ../../../vcglib/eigenlib
 
-win32:INCLUDEPATH += ../../../glew/include ../../../corto/include
-win32:LIBS += opengl32.lib GLU32.lib ../../../glew/lib/glew32.lib ../../../corto/lib/corto.lib
+win32:INCLUDEPATH += "C:/Program Files/vcpkg/packages/glew_x64-windows/lib/include" ../../../corto/include
+win32:LIBS += opengl32.lib GLU32.lib "C:/Program Files/vcpkg/packages/glew_x64-windows/lib/glew32.lib" ../../../corto/Build/Release/corto.lib \
+        "C:\Users\nicol\Desktop\Lavoro\Repo\corto\Build\deps\lz4\build\cmake\Release\lz4.lib"
 
 unix:INCLUDEPATH += /usr/local/lib
 unix:LIBS += -L /usr/local/lib -lcorto
@@ -27,16 +28,14 @@ SOURCES += \
     ../common/nexusdata.cpp \
     ../common/traversal.cpp \
     ../common/cone.cpp \
-    ../nxszip/meshcoder.cpp \
-    ../nxszip/meshdecoder.cpp \
-    ../nxszip/abitstream.cpp \
-    ../nxszip/atunstall.cpp \
+    ../common/qtnexusfile.cpp \
     main_compress.cpp \
     extractor.cpp
 
 HEADERS += \
     ../../../vcglib/wrap/system/qgetopt.h \
     ../common/virtualarray.h \
+    ../common/qtnexusfile.h \
     ../common/nexusdata.h \
     ../common/traversal.h \
     ../common/signature.h \
@@ -44,13 +43,7 @@ HEADERS += \
     ../nxszip/model.h \
     ../nxszip/range.h \
     ../nxszip/fpu_precision.h \
-    ../nxszip/bytestream.h \
     ../nxszip/math_class.h \
-    ../nxszip/bitstream.h \
-    ../nxszip/tunstall.h \
-    ../nxszip/cstream.h \
-    ../nxszip/meshcoder.h \
-    ../nxszip/meshdecoder.h \
     extractor.h
 
 DESTDIR = "../../bin"

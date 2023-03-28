@@ -15,6 +15,7 @@ public:
 	int color_bits[4];
 	int norm_bits;
 	float tex_step; //in pixel units
+    uint32_t version;
 
 	Extractor(nx::NexusData *nexus);
 

@@ -18,8 +18,6 @@ for more details.
 #include <QTextStream>
 #include "extractor.h"
 
-#include "../nxszip/meshcoder.h"
-//typedef MeshCoder MeshEncoder;
 #include <corto/corto.h>
 
 using namespace std;
@@ -30,7 +28,8 @@ Extractor::Extractor(NexusData *nx):
 	max_size(0), current_size(0),
 	min_error(0),current_error(0),
 	max_triangles(0), current_triangles(0) {
-	
+    version = nx->header.version;
+
 	nexus = nx;
 	selected.resize(nexus->header.n_nodes, true);
 	selected.back() = false;
@@ -262,34 +261,7 @@ quint32 Extractor::pad(quint32 s) {
 
 void Extractor::compress(QFile &file, nx::Signature &signature, nx::Node &node, nx::NodeData &data, Patch *patches) {
 	
-	//detect first node error which is out of boundary.
-	if(signature.flags & Signature::MECO) {
-		
-		meco::MeshEncoder coder(node, data, patches, signature);
-		coder.coord_q = coord_q;
-		coder.error = error_factor*node.error;
-		coder.norm_q = norm_bits;
-		for(int k = 0; k < 4; k++)
-			coder.color_q[k] = color_bits[k];
-		//HER if signaure has texture was set to (int)log2(tex_step * pow(2, -12)); //here set to -14
-		//here we shold set to -log2(max_side/tex_step) where max_side width or height of the associated texture.
-		//unfortunately we have no really fast to provide this info.....
-		//so assume
-		coder.tex_q = -(int)log2(512/tex_step);
-		
-		coder.encode();
-		
-		//cout << "V size: " << coder.coord_size << endl;
-		//cout << "N size: " << coder.normal_size << endl;
-		//cout << "C size: " << coder.color_size << endl;
-		//cout << "I size: " << coder.face_size << endl;
-		
-		file.write((char *)&*coder.stream.buffer, coder.stream.size());
-		//padding
-		quint64 size = pad(file.pos()) - file.pos();
-		char tmp[NEXUS_PADDING];
-		file.write(tmp, size);
-	} else if(signature.flags & Signature::CORTO) {
+    if(signature.flags & Signature::CORTO) {
 		
 		crt::Encoder encoder(node.nvert, node.nface);
 		
@@ -302,12 +274,13 @@ void Extractor::compress(QFile &file, nx::Signature &signature, nx::Node &node, 
 			encoder.addPositions((float *)data.coords(), data.faces(signature, node.nvert), pow(2, coord_q));
 		
 		if(signature.vertex.hasNormals()) {
-			encoder.addNormals((int16_t *)data.normals(signature, node.nvert), norm_bits, 
+            encoder.addNormals((int16_t *)data.normals(signature, node.nvert, version), norm_bits,
 							   node.nface == 0? crt::NormalAttr::DIFF : crt::NormalAttr::ESTIMATED);
-		}
+        }
 		
 		if(signature.vertex.hasColors())
-			encoder.addColors((unsigned char *)data.colors(signature, node.nvert), color_bits[0], color_bits[1], color_bits[2], color_bits[3]);
+            encoder.addColors((unsigned char *)data.colors(signature, node.nvert, version), color_bits[0],
+                    color_bits[1], color_bits[2], color_bits[3]);
 		
 		if(signature.vertex.hasTextures())
 			encoder.addUvs((float *)data.texCoords(signature, node.nvert), tex_step/512);
@@ -439,7 +412,7 @@ void Extractor::savePly(QString filename) {
 		char *buffer = new char[bytes_per_vertex * node.nvert];
 		char *pos = buffer;
 		vcg::Point3f *coords = data.coords();
-		vcg::Color4b *colors = data.colors(nexus->header.signature, node.nvert);
+        vcg::Color4b *colors = data.colors(nexus->header.signature, node.nvert, version);
 		for(int k = 0; k < node.nvert; k++) {
 			vcg::Point3f *p = (vcg::Point3f *)pos;
 			*p = coords[k];
@@ -566,7 +539,7 @@ void Extractor::saveUnifiedPly(QString filename) {
 		nexus->loadRam(i);
 		
 		vcg::Point3f *coords = data.coords();
-		vcg::Color4b *colors = data.colors(nexus->header.signature, node.nvert);
+        vcg::Color4b *colors = data.colors(nexus->header.signature, node.nvert, version);
 		uint16_t *triangles = data.faces(nexus->header.signature, node.nvert);
 		
 		

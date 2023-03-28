@@ -22,7 +22,6 @@ for more details.
 #include <vcg/space/line3.h>
 #include <vcg/space/intersection3.h>
 
-#include "../nxszip/meshdecoder.h"
 #include <corto/decoder.h>
 
 //#if _MSC_VER >= 1800
@@ -151,6 +150,7 @@ uint32_t NexusData::size(uint32_t node) {
 
 uint64_t NexusData::loadRam(uint32_t n) {
 
+    uint32_t version = header.version;
 	Signature &sign = header.signature;
 	Node &node = nodes[n];
 	uint64_t offset = node.getBeginOffset();
@@ -175,19 +175,15 @@ uint64_t NexusData::loadRam(uint32_t n) {
 
 		int iterations = 1;
 
-		if(sign.flags & Signature::MECO) {
-			meco::MeshDecoder coder(node, d, patches, sign);
-			coder.decode(compressed_size, (unsigned char *)buffer);
-
-		} else if(sign.flags & Signature::CORTO) {
+        if(sign.flags & Signature::CORTO) {
 
 			crt::Decoder decoder(compressed_size, (unsigned char *)buffer);
 
 			decoder.setPositions((float *)d.coords());
 			if(sign.vertex.hasNormals())
-				decoder.setNormals((int16_t *)d.normals(sign, node.nvert));
+                decoder.setNormals((int16_t *)d.normals(sign, node.nvert, header.version));
 			if(sign.vertex.hasColors())
-				decoder.setColors((unsigned char *)d.colors(sign, node.nvert));
+                decoder.setColors((unsigned char *)d.colors(sign, node.nvert, header.version));
 			if(sign.vertex.hasTextures())
 				decoder.setUvs((float *)d.texCoords(sign, node.nvert));
 			if(node.nface)
@@ -210,7 +206,7 @@ uint64_t NexusData::loadRam(uint32_t n) {
 			memcpy(d.coords(), &*coords.begin(), sizeof(Point3f)*node.nvert);
 
                if(sign.vertex.hasColors()) {
-                    Color4b *c = d.colors(sign, node.nvert);
+                    Color4b *c = d.colors(sign, node.nvert, header.version);
                     std::vector<Color4b> colors(node.nvert);
                     for(int i =0; i < node.nvert; i++)
                         colors[i] = c[order[i]];
@@ -218,7 +214,7 @@ uint64_t NexusData::loadRam(uint32_t n) {
                 }
 
 			if(sign.vertex.hasNormals()) {
-				Point3s *n = d.normals(sign, node.nvert);
+                Point3s *n = d.normals(sign, node.nvert, header.version);
 				std::vector<Point3s> normals(node.nvert);
 				for(int i =0; i < node.nvert; i++)
 					normals[i] = n[order[i]];

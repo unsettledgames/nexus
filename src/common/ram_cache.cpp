@@ -16,7 +16,6 @@ GNU General Public License (http://www.gnu.org/licenses/gpl.txt)
 for more details.
 */
 #include "ram_cache.h"
-#include "../nxszip/meshdecoder.h"
 
 #include <corto/decoder.h>
 
@@ -90,6 +89,7 @@ void RamCache::loadNexus(Nexus *nexus) {
 int RamCache::get(nx::Token *in) {
 	if(in->nexus->isStreaming()) {
 #ifdef USE_CURL
+        uint32_t version = in->nexus->header.version;
 		auto &signature = in->nexus->header.signature;
 		Node &node = in->nexus->nodes[in->node];
 		NodeData &nodedata = in->nexus->nodedata[in->node];
@@ -104,12 +104,7 @@ int RamCache::get(nx::Token *in) {
 			char *buffer = nodedata.memory;
 			nodedata.memory = new char[size];
 
-			if(signature.flags & Signature::MECO) {
-
-				meco::MeshDecoder coder(node, nodedata, in->nexus->patches, signature);
-				coder.decode(node.getSize(), (unsigned char *)buffer);
-
-			} else if(signature.flags & Signature::CORTO) {
+            if(signature.flags & Signature::CORTO) {
 
 				crt::Decoder decoder(node.getSize(), (unsigned char *)buffer);
 
