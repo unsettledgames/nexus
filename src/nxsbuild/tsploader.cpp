@@ -20,52 +20,54 @@ for more details.
 #include <iostream>
 using namespace std;
 
+namespace nx
+{
+    TspLoader::TspLoader(QString filename) {
 
-TspLoader::TspLoader(QString filename) {
+        has_colors = true;
+        has_normals = has_textures = false;
 
-	has_colors = true;
-	has_normals = has_textures = false;
+        file.setFileName(filename);
+        if(!file.open(QIODevice::ReadOnly))
+            throw QString("could not open file " + filename);
+    }
 
-	file.setFileName(filename);
-	if(!file.open(QIODevice::ReadOnly))
-		throw QString("could not open file " + filename);
-}
+    Triangle readTriangle(float *tmp) {
+        Triangle triangle;
+        uint color_offset = 3 * 3 * 2; //vertices and normals
+        for (int i = 0; i < 3; i++) {
+            Vertex &vertex = triangle.vertices[i];
+            for (int k = 0; k < 3; k++) {
+                vertex.v[k] = tmp[i * 3 + k];
 
-Triangle readTriangle(float *tmp) {
-	Triangle triangle;
-	uint color_offset = 3 * 3 * 2; //vertices and normals
-	for (int i = 0; i < 3; i++) {
-		Vertex &vertex = triangle.vertices[i];
-		for (int k = 0; k < 3; k++) {
-			vertex.v[k] = tmp[i * 3 + k];
+                vertex.c[k] = 255 * tmp[color_offset + i * 3 + k];
+            }
+            vertex.c[3] = 255;
+        }
+        triangle.node = 0;
+        return triangle;
+    }
 
-			vertex.c[k] = 255 * tmp[color_offset + i * 3 + k];
-		}
-		vertex.c[3] = 255;
-	}
-	triangle.node = 0;
-	return triangle;
-}
+    quint32 TspLoader::getTriangles(quint32 triangle_no, Triangle *buffer) {
 
-quint32 TspLoader::getTriangles(quint32 triangle_no, Triangle *buffer) {
+        uint vertex_size = 9 * sizeof(float);
+        uint triangle_size = 3 * vertex_size;
+        uint size = triangle_no * triangle_size;
+        float *tmp = new float[size];
+        quint32 readed = file.read((char *)tmp, size) / triangle_size;
 
-	uint vertex_size = 9 * sizeof(float);
-	uint triangle_size = 3 * vertex_size;
-	uint size = triangle_no * triangle_size;
-	float *tmp = new float[size];
-	quint32 readed = file.read((char *)tmp, size) / triangle_size;
+        float *pos = tmp;
+        int count = 0;
+        for (uint i = 0; i < readed; i++) {
+            Triangle &triangle = buffer[count];
+            triangle = readTriangle(pos);
+            pos += 3 * 9;
+            if (triangle.isDegenerate()) continue;
+            current_triangle++;
+            count++;
+        }
+        delete[]tmp;
 
-	float *pos = tmp;
-	int count = 0;
-	for (uint i = 0; i < readed; i++) {
-		Triangle &triangle = buffer[count];
-		triangle = readTriangle(pos);
-		pos += 3 * 9;
-		if (triangle.isDegenerate()) continue;
-		current_triangle++;
-		count++;
-	}
-	delete[]tmp;
-
-	return count;
+        return count;
+    }
 }

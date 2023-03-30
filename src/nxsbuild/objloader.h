@@ -25,36 +25,39 @@ for more details.
 #include <QMap>
 #include <vector>
 
+namespace nx
+{
+    class ObjLoader: public MeshLoader {
+    public:
+        ObjLoader(QString file, QString mtl);
+        ~ObjLoader();
 
-class ObjLoader: public MeshLoader {
-public:
-	ObjLoader(QString file, QString mtl);
-	~ObjLoader();
+        void setMaxMemory(quint64 max_memory);
+        quint32 getTriangles(quint32 size, Triangle *buffer);
+        quint32 getVertices(quint32 size, Splat *vertex);
 
-	void setMaxMemory(quint64 max_memory);
-	quint32 getTriangles(quint32 size, Triangle *buffer);
-	quint32 getVertices(quint32 size, Splat *vertex);
+    private:
 
-private:
-	
-	void readMTL();
-	void cacheTextureUV();
-	void cacheVertices();
-	
-	QFile file;
-	QString mtl;
-	VirtualArray<Vertex> vertices;
-	std::vector<float> vtxtuv;
-	quint64 n_vertices;
-	quint64 n_triangles;
-	quint64 current_triangle;
-	quint64 current_vertex;
-	qint64  current_tri_pos = 0;
-	quint32  current_color = 0;
-	qint32  current_texture_id = -1;
-	QMap<QString, quint32> colors_map;
-	QMap<QString, QString> textures_map;
-	
-	
-};
+        void readMTL();
+        void cacheTextureUV();
+        void cacheVertices();
+
+        QFile file;
+        QString mtl;
+        VirtualArray<Vertex> vertices;
+        std::vector<float> vtxtuv;
+        quint64 n_vertices;
+        quint64 n_triangles;
+        quint64 current_triangle;
+        quint64 current_vertex;
+        qint64  current_tri_pos = 0;
+        quint32  current_color = 0;
+        qint32  current_texture_id = -1;
+        QMap<QString, quint32> colors_map;
+        QMap<QString, QString> textures_map;
+
+
+    };
+}
+
 #endif // NX_OBJLOADER_H

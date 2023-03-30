@@ -18,18 +18,21 @@ for more details.
 #include "meshloader.h"
 #include <QFileInfo>
 
-void MeshLoader::quantize(float &value) {
-	if(!quantization) return;
-	value = quantization*(int)(value/quantization);
-}
+namespace nx
+{
+    void MeshLoader::quantize(float &value) {
+        if(!quantization) return;
+        value = quantization*(int)(value/quantization);
+    }
 
-void MeshLoader::sanitizeTextureFilepath(QString &textureFilepath) {
-  std::replace( textureFilepath.begin(), textureFilepath.end(), QChar('\\'), QChar('/') );
-}
+    void MeshLoader::sanitizeTextureFilepath(QString &textureFilepath) {
+      std::replace( textureFilepath.begin(), textureFilepath.end(), QChar('\\'), QChar('/') );
+    }
 
-void MeshLoader::resolveTextureFilepath(const QString &modelFilepath, QString &textureFilepath) {
-  QFileInfo file(modelFilepath);
-  QString path = file.path();
+    void MeshLoader::resolveTextureFilepath(const QString &modelFilepath, QString &textureFilepath) {
+      QFileInfo file(modelFilepath);
+      QString path = file.path();
 
-  textureFilepath = path + "/" + textureFilepath;
+      textureFilepath = path + "/" + textureFilepath;
+    }
 }

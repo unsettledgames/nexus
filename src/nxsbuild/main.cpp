@@ -31,6 +31,7 @@ for more details.
 #include "tsploader.h"
 
 using namespace std;
+using namespace nx;
 
 int main(int argc, char *argv[]) {
 

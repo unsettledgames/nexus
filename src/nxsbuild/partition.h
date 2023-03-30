@@ -22,14 +22,18 @@ for more details.
 #include "trianglesoup.h"
 #include <vector>
 
-class StreamSoup;
+namespace nx
+{
+    class StreamSoup;
 
-class Partition: public VirtualTriangleSoup {
-public:
-	Partition(QString prefix): VirtualTriangleSoup(prefix) {}
-	virtual ~Partition() {}
-	virtual void load(StreamSoup &stream) = 0;
-	virtual bool isInNode(quint32 node, vcg::Point3f &p) = 0;
-};
+    class Partition: public VirtualTriangleSoup {
+    public:
+        Partition(QString prefix): VirtualTriangleSoup(prefix) {}
+        virtual ~Partition() {}
+        virtual void load(StreamSoup &stream) = 0;
+        virtual bool isInNode(quint32 node, vcg::Point3f &p) = 0;
+    };
+}
+
 
 #endif // NX_PARTITION_H

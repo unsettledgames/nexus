@@ -31,8 +31,9 @@ for more details.
 #include "../common/virtualarray.h"
 #include "texpyramid.h"
 
+class QImage;
 
-
+namespace nx {
 class KDTree;
 class KDTreeSoup;
 class KDTreeCloud;
@@ -40,13 +41,9 @@ class Stream;
 class StreamSoup;
 class StreamCloud;
 
-class QImage;
 class TMesh;
 
-namespace nx {
-
 class Nexus;
-}
 
 //Structures used for normalization
 struct NodeBox {
@@ -129,7 +126,7 @@ public:
 	std::vector<QString> images;
 
 	quint64 input_pixels, output_pixels;
-	nx::TexAtlas atlas;
+    nx::TexAtlas atlas;
 	QTemporaryFile nodeTex; //texure images for each node stored here.
 	quint64 max_memory;
 	int n_threads = 4;
@@ -155,5 +152,5 @@ public:
 
 	void testSaturation();
 };
-
+}
 #endif // NX_NEXUSBUILDER_H
