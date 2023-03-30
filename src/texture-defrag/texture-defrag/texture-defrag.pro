@@ -1,8 +1,11 @@
+TARGET=texture_defrag
 VCGPATH = $$PWD/../vcglib
 
 CONFIG += staticlib
 CONFIG += c++11
 CONFIG -= app_bundle
+
+INCLUDEPATH += $$VCGPATH $$VCGPATH/eigenlib $$PWD/../src
 
 #### QT STUFF ##################################################################
 
@@ -21,7 +24,7 @@ win32 {
 }
 
 
-SOURCES += main.cpp \
+SOURCES += \
     ../src/intersection.cpp \
     ../src/mesh_attribute.cpp \
     ../src/packing.cpp \

@@ -23,61 +23,63 @@
 #include "math_utils.h"
 #include "logging.h"
 
-void Compute3DFaceAdjacencyAttribute(Mesh& m)
+namespace Defrag
 {
-    auto ffadj = Get3DFaceAdjacencyAttribute(m);
-    tri::UpdateTopology<Mesh>::FaceFace(m);
-    for (auto& f : m.face) {
-        for (int i = 0; i < 3; ++i) {
-            ffadj[f].f[i] = tri::Index(m, f.FFp(i));
-            ffadj[f].e[i] = f.FFi(i);
-        }
-    }
-}
-
-void ComputeWedgeTexCoordStorageAttribute(Mesh& m)
-{
-    auto WTCSh = GetWedgeTexCoordStorageAttribute(m);
-    for (auto &f : m.face) {
-        for (int i = 0; i < 3; ++i) {
-            WTCSh[&f].tc[i].P() = f.WT(i).P();
-            WTCSh[&f].tc[i].N() = f.WT(i).N();
-        }
-    }
-}
-
-// assumes topology is updated (FaceFace)
-void ComputeBoundaryInfoAttribute(Mesh& m)
-{
-    BoundaryInfo& info = (tri::Allocator<Mesh>::GetPerMeshAttribute<BoundaryInfo>(m, "MeshAttribute_BoundaryInfo"))();
-    info.Clear();
-    tri::UpdateFlags<Mesh>::FaceClearV(m);
-    for (auto& f : m.face) {
-        for (int i = 0; i < 3; ++i) {
-            if (!f.IsV() && face::IsBorder(f, i)) {
-                double totalBorderLength = 0;
-                std::vector<std::size_t> borderFaces;
-                std::vector<int> vi;
-
-                face::Pos<Mesh::FaceType> p(&f, i);
-                face::Pos<Mesh::FaceType> startPos = p;
-                ensure(p.IsBorder());
-                do {
-                    ensure(p.IsManifold());
-                    p.F()->SetV();
-                    borderFaces.push_back(tri::Index(m, p.F()));
-                    vi.push_back(p.VInd());
-                    totalBorderLength += EdgeLength(*p.F(), p.VInd());
-                    p.NextB();
-                } while (p != startPos);
-                info.vBoundaryLength.push_back(totalBorderLength);
-                info.vBoundarySize.push_back(borderFaces.size());
-                info.vBoundaryFaces.push_back(borderFaces);
-                info.vVi.push_back(vi);
+    void Compute3DFaceAdjacencyAttribute(Mesh& m)
+    {
+        auto ffadj = Get3DFaceAdjacencyAttribute(m);
+        tri::UpdateTopology<Mesh>::FaceFace(m);
+        for (auto& f : m.face) {
+            for (int i = 0; i < 3; ++i) {
+                ffadj[f].f[i] = tri::Index(m, f.FFp(i));
+                ffadj[f].e[i] = f.FFi(i);
             }
         }
     }
 
-    LOG_DEBUG << "Mesh has " << info.N() << " boundaries";
-}
+    void ComputeWedgeTexCoordStorageAttribute(Mesh& m)
+    {
+        auto WTCSh = GetWedgeTexCoordStorageAttribute(m);
+        for (auto &f : m.face) {
+            for (int i = 0; i < 3; ++i) {
+                WTCSh[&f].tc[i].P() = f.WT(i).P();
+                WTCSh[&f].tc[i].N() = f.WT(i).N();
+            }
+        }
+    }
 
+    // assumes topology is updated (FaceFace)
+    void ComputeBoundaryInfoAttribute(Mesh& m)
+    {
+        BoundaryInfo& info = (tri::Allocator<Mesh>::GetPerMeshAttribute<BoundaryInfo>(m, "MeshAttribute_BoundaryInfo"))();
+        info.Clear();
+        tri::UpdateFlags<Mesh>::FaceClearV(m);
+        for (auto& f : m.face) {
+            for (int i = 0; i < 3; ++i) {
+                if (!f.IsV() && face::IsBorder(f, i)) {
+                    double totalBorderLength = 0;
+                    std::vector<std::size_t> borderFaces;
+                    std::vector<int> vi;
+
+                    face::Pos<Mesh::FaceType> p(&f, i);
+                    face::Pos<Mesh::FaceType> startPos = p;
+                    ensure(p.IsBorder());
+                    do {
+                        ensure(p.IsManifold());
+                        p.F()->SetV();
+                        borderFaces.push_back(tri::Index(m, p.F()));
+                        vi.push_back(p.VInd());
+                        totalBorderLength += EdgeLength(*p.F(), p.VInd());
+                        p.NextB();
+                    } while (p != startPos);
+                    info.vBoundaryLength.push_back(totalBorderLength);
+                    info.vBoundarySize.push_back(borderFaces.size());
+                    info.vBoundaryFaces.push_back(borderFaces);
+                    info.vVi.push_back(vi);
+                }
+            }
+        }
+
+        LOG_DEBUG << "Mesh has " << info.N() << " boundaries";
+    }
+}

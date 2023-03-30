@@ -28,58 +28,61 @@
 #include <string>
 
 class QImage;
-class TextureObject;
 
-typedef std::shared_ptr<TextureObject> TextureObjectHandle;
+namespace Defrag
+{
+    class TextureObject;
 
-struct TextureSize {
-    int w;
-    int h;
-};
+    typedef std::shared_ptr<TextureObject> TextureObjectHandle;
 
-struct TextureImageInfo {
-    std::string path;
-    TextureSize size;
-};
+    struct TextureSize {
+        int w;
+        int h;
+    };
 
-/* wrapper to an array of textures */
-struct TextureObject {
+    struct TextureImageInfo {
+        std::string path;
+        TextureSize size;
+    };
 
-    std::vector<TextureImageInfo> texInfoVec;
-    std::vector<uint32_t> texNameVec;
+    /* wrapper to an array of textures */
+    struct TextureObject {
 
-    TextureObject();
-    ~TextureObject();
+        std::vector<TextureImageInfo> texInfoVec;
+        std::vector<uint32_t> texNameVec;
 
-    TextureObject(const TextureObject &) = delete;
-    TextureObject &operator=(const TextureObject &) = delete;
+        TextureObject();
+        ~TextureObject();
 
-    /* Add QImage ref to the texture object */
-    bool AddImage(std::string path);
+        TextureObject(const TextureObject &) = delete;
+        TextureObject &operator=(const TextureObject &) = delete;
 
-    /* Binds the texture at index i */
-    void Bind(int i);
+        /* Add QImage ref to the texture object */
+        bool AddImage(std::string path);
 
-    /* Releases the texture i, without unbinding it if it is bound */
-    void Release(int i);
+        /* Binds the texture at index i */
+        void Bind(int i);
 
-    int TextureWidth(std::size_t i);
-    int TextureHeight(std::size_t i);
+        /* Releases the texture i, without unbinding it if it is bound */
+        void Release(int i);
 
-    int MaxSize();
-    std::vector<TextureSize> GetTextureSizes();
+        int TextureWidth(std::size_t i);
+        int TextureHeight(std::size_t i);
 
-    std::size_t ArraySize();
+        int MaxSize();
+        std::vector<TextureSize> GetTextureSizes();
 
-    int64_t TextureArea(std::size_t i);
-    double GetResolutionInMegaPixels();
+        std::size_t ArraySize();
 
-    std::vector<std::pair<double, double>> ComputeRelativeSizes();
-};
+        int64_t TextureArea(std::size_t i);
+        double GetResolutionInMegaPixels();
 
-/* Vertically mirrors a QImage in-place, useful to match the OpenGL convention
- * for texture data storage */
-void Mirror(QImage& img);
+        std::vector<std::pair<double, double>> ComputeRelativeSizes();
+    };
 
+    /* Vertically mirrors a QImage in-place, useful to match the OpenGL convention
+     * for texture data storage */
+    void Mirror(QImage& img);
+}
 
 #endif // TEXTURE_OBJECT_H

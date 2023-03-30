@@ -29,152 +29,153 @@
 #include <QImageReader>
 #include <QImage>
 
-
-TextureObject::TextureObject()
+namespace Defrag
 {
-}
-
-TextureObject::~TextureObject()
-{
-    for (std::size_t i = 0; i < texNameVec.size(); ++i)
-        Release(i);
-}
-
-bool TextureObject::AddImage(std::string path)
-{
-    QImageReader qir(QString(path.c_str()));
-    if (qir.canRead()) {
-        TextureImageInfo tii = {};
-        tii.path = path;
-        tii.size = { qir.size().width(), qir.size().height() };
-        texInfoVec.push_back(tii);
-        texNameVec.push_back(0);
-        return true;
-    } else return false;
-}
-
-void TextureObject::Bind(int i)
-{
-    OpenGLFunctionsHandle glFuncs = GetOpenGLFunctionsHandle();
-    ensure(i >= 0 && i < (int) texInfoVec.size());
-    // load texture from qimage on first use
-    if (texNameVec[i] == 0) {
-        QImage img(texInfoVec[i].path.c_str());
-        ensure(!img.isNull());
-        if ((img.format() != QImage::Format_RGB32) || (img.format() != QImage::Format_ARGB32)) {
-            QImage glimg = img.convertToFormat(QImage::Format_ARGB32);
-            img = glimg;
-        }
-        glFuncs->glGenTextures(1, &texNameVec[i]);
-
-        Mirror(img);
-        glFuncs->glBindTexture(GL_TEXTURE_2D, texNameVec[i]);
-        int miplevels = std::log2((float) img.width());
-        int width = img.width();
-        int height = img.height();
-        for (int m = 0; m < miplevels; m++) {
-            glFuncs->glTexImage2D(GL_TEXTURE_2D, m, GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-            width = std::max(1, (width / 2));
-            height = std::max(1, (height / 2));
-        }
-        //glFuncs->glTexStorage2D(GL_TEXTURE_2D, miplevels, GL_RGBA8, img.width(), img.height());
-        glFuncs->glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, img.width(), img.height(), GL_BGRA, GL_UNSIGNED_BYTE, img.constBits());
-        glFuncs->glGenerateMipmap(GL_TEXTURE_2D);
-        CheckGLError();
+    TextureObject::TextureObject()
+    {
     }
-    else {
-        glFuncs->glBindTexture(GL_TEXTURE_2D, texNameVec[i]);
-        CheckGLError();
-    }
-}
 
-void TextureObject::Release(int i)
-{
-    ensure(i >= 0 && i < (int) texInfoVec.size());
-    if (texNameVec[i]) {
+    TextureObject::~TextureObject()
+    {
+        for (std::size_t i = 0; i < texNameVec.size(); ++i)
+            Release(i);
+    }
+
+    bool TextureObject::AddImage(std::string path)
+    {
+        QImageReader qir(QString(path.c_str()));
+        if (qir.canRead()) {
+            TextureImageInfo tii = {};
+            tii.path = path;
+            tii.size = { qir.size().width(), qir.size().height() };
+            texInfoVec.push_back(tii);
+            texNameVec.push_back(0);
+            return true;
+        } else return false;
+    }
+
+    void TextureObject::Bind(int i)
+    {
         OpenGLFunctionsHandle glFuncs = GetOpenGLFunctionsHandle();
-        glFuncs->glDeleteTextures(1, &texNameVec[i]);
-        texNameVec[i] = 0;
+        ensure(i >= 0 && i < (int) texInfoVec.size());
+        // load texture from qimage on first use
+        if (texNameVec[i] == 0) {
+            QImage img(texInfoVec[i].path.c_str());
+            ensure(!img.isNull());
+            if ((img.format() != QImage::Format_RGB32) || (img.format() != QImage::Format_ARGB32)) {
+                QImage glimg = img.convertToFormat(QImage::Format_ARGB32);
+                img = glimg;
+            }
+            glFuncs->glGenTextures(1, &texNameVec[i]);
+
+            Mirror(img);
+            glFuncs->glBindTexture(GL_TEXTURE_2D, texNameVec[i]);
+            int miplevels = std::log2((float) img.width());
+            int width = img.width();
+            int height = img.height();
+            for (int m = 0; m < miplevels; m++) {
+                glFuncs->glTexImage2D(GL_TEXTURE_2D, m, GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+                width = std::max(1, (width / 2));
+                height = std::max(1, (height / 2));
+            }
+            //glFuncs->glTexStorage2D(GL_TEXTURE_2D, miplevels, GL_RGBA8, img.width(), img.height());
+            glFuncs->glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, img.width(), img.height(), GL_BGRA, GL_UNSIGNED_BYTE, img.constBits());
+            glFuncs->glGenerateMipmap(GL_TEXTURE_2D);
+            CheckGLError();
+        }
+        else {
+            glFuncs->glBindTexture(GL_TEXTURE_2D, texNameVec[i]);
+            CheckGLError();
+        }
+    }
+
+    void TextureObject::Release(int i)
+    {
+        ensure(i >= 0 && i < (int) texInfoVec.size());
+        if (texNameVec[i]) {
+            OpenGLFunctionsHandle glFuncs = GetOpenGLFunctionsHandle();
+            glFuncs->glDeleteTextures(1, &texNameVec[i]);
+            texNameVec[i] = 0;
+        }
+    }
+
+    int TextureObject::TextureWidth(std::size_t i)
+    {
+        ensure(i < texInfoVec.size());
+        return texInfoVec[i].size.w;
+    }
+
+    int TextureObject::TextureHeight(std::size_t i)
+    {
+        ensure(i < texInfoVec.size());
+        return texInfoVec[i].size.h;
+    }
+
+    int TextureObject::MaxSize()
+    {
+        int maxsz = 0;
+        for (unsigned i = 0; i < ArraySize(); ++i) {
+            maxsz = std::max(maxsz, TextureWidth(i));
+            maxsz = std::max(maxsz, TextureHeight(i));
+        }
+        return maxsz;
+    }
+
+    std::vector<TextureSize> TextureObject::GetTextureSizes()
+    {
+        std::vector<TextureSize> texszVec;
+        for (unsigned i = 0; i < ArraySize(); ++i)
+            texszVec.push_back({TextureWidth(i), TextureHeight(i)});
+        return texszVec;
+
+    }
+
+    std::size_t TextureObject::ArraySize()
+    {
+        return texInfoVec.size();
+    }
+
+    int64_t TextureObject::TextureArea(std::size_t i)
+    {
+        ensure(i < ArraySize());
+        return ((int64_t) TextureWidth(i)) * TextureHeight(i);
+    }
+
+    double TextureObject::GetResolutionInMegaPixels()
+    {
+        int64_t totArea = 0;
+        for (unsigned i = 0; i < ArraySize(); ++i) {
+            totArea += TextureArea(i);
+        }
+        return totArea / 1000000.0;
+    }
+
+    std::vector<std::pair<double, double>> TextureObject::ComputeRelativeSizes()
+    {
+        std::vector<TextureSize> texSizeVec = GetTextureSizes();
+        int maxsz = 0;
+        for (auto tsz : texSizeVec) {
+            maxsz = std::max(maxsz, tsz.h);
+            maxsz = std::max(maxsz, tsz.w);
+        }
+        std::vector<std::pair<double, double>> trs;
+        for (auto tsz : texSizeVec) {
+            double rw = tsz.w / (double) maxsz;
+            double rh = tsz.h / (double) maxsz;
+            trs.push_back(std::make_pair(rw, rh));
+        }
+        return trs;
+    }
+
+    void Mirror(QImage& img)
+    {
+        int i = 0;
+        while (i < (img.height() / 2)) {
+            QRgb *line0 = (QRgb *) img.scanLine(i);
+            QRgb *line1 = (QRgb *) img.scanLine(img.height() - 1 - i);
+            i++;
+            for (int j = 0; j < img.width(); ++j)
+                std::swap(line0[j], line1[j]);
+        }
     }
 }
-
-int TextureObject::TextureWidth(std::size_t i)
-{
-    ensure(i < texInfoVec.size());
-    return texInfoVec[i].size.w;
-}
-
-int TextureObject::TextureHeight(std::size_t i)
-{
-    ensure(i < texInfoVec.size());
-    return texInfoVec[i].size.h;
-}
-
-int TextureObject::MaxSize()
-{
-    int maxsz = 0;
-    for (unsigned i = 0; i < ArraySize(); ++i) {
-        maxsz = std::max(maxsz, TextureWidth(i));
-        maxsz = std::max(maxsz, TextureHeight(i));
-    }
-    return maxsz;
-}
-
-std::vector<TextureSize> TextureObject::GetTextureSizes()
-{
-    std::vector<TextureSize> texszVec;
-    for (unsigned i = 0; i < ArraySize(); ++i)
-        texszVec.push_back({TextureWidth(i), TextureHeight(i)});
-    return texszVec;
-
-}
-
-std::size_t TextureObject::ArraySize()
-{
-    return texInfoVec.size();
-}
-
-int64_t TextureObject::TextureArea(std::size_t i)
-{
-    ensure(i < ArraySize());
-    return ((int64_t) TextureWidth(i)) * TextureHeight(i);
-}
-
-double TextureObject::GetResolutionInMegaPixels()
-{
-    int64_t totArea = 0;
-    for (unsigned i = 0; i < ArraySize(); ++i) {
-        totArea += TextureArea(i);
-    }
-    return totArea / 1000000.0;
-}
-
-std::vector<std::pair<double, double>> TextureObject::ComputeRelativeSizes()
-{
-    std::vector<TextureSize> texSizeVec = GetTextureSizes();
-    int maxsz = 0;
-    for (auto tsz : texSizeVec) {
-        maxsz = std::max(maxsz, tsz.h);
-        maxsz = std::max(maxsz, tsz.w);
-    }
-    std::vector<std::pair<double, double>> trs;
-    for (auto tsz : texSizeVec) {
-        double rw = tsz.w / (double) maxsz;
-        double rh = tsz.h / (double) maxsz;
-        trs.push_back(std::make_pair(rw, rh));
-    }
-    return trs;
-}
-
-void Mirror(QImage& img)
-{
-    int i = 0;
-    while (i < (img.height() / 2)) {
-        QRgb *line0 = (QRgb *) img.scanLine(i);
-        QRgb *line1 = (QRgb *) img.scanLine(img.height() - 1 - i);
-        i++;
-        for (int j = 0; j < img.width(); ++j)
-            std::swap(line0[j], line1[j]);
-    }
-}
-

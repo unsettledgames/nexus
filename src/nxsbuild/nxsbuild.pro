@@ -3,7 +3,8 @@ QT       += core gui
 TARGET   = nxsbuild
 CONFIG   += console
 CONFIG   -= app_bundle
-TEMPLATE = app
+TEMPLATE = subdirs
+SUBDIRS += ../texture-defrag/texture-defrag
 
 QMAKE_CXXFLAGS += -std=c++11 -g -fpermissive
 
@@ -16,8 +17,9 @@ DEFINES += _USE_MATH_DEFINES
 
 win32-msvc: DEFINES += NOMINMAX
 
-unix:LIBS += -lGLU
-win32:LIBS += "C:/Program Files/vcpkg/packages/glew_x64-windows/lib/glew32.lib"
+unix:LIBS += -lGLU -ltexture_defrag
+
+win32:LIBS += "C:/Program Files/vcpkg/packages/glew_x64-windows/lib/glew32.lib" -ltexture_defrag
 
 SOURCES += \
     ../../../vcglib/wrap/system/qgetopt.cpp \

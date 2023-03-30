@@ -34,118 +34,121 @@
 #include "mesh.h"
 #include "math_utils.h"
 
-class Mesh;
+namespace Defrag
+{
+    class Mesh;
 
-typedef std::pair<ChartHandle, ChartHandle> ChartPair;
+    typedef std::pair<ChartHandle, ChartHandle> ChartPair;
 
-/* FaceGroup class
- * Used to store a mesh chart as an array of Face pointers */
-struct FaceGroup {
+    /* FaceGroup class
+     * Used to store a mesh chart as an array of Face pointers */
+    struct FaceGroup {
 
-    struct Hasher {
-        std::size_t operator()(const ChartHandle& ch) const
-        {
-            return std::hash<RegionID>()(ch->id);
-        }
+        struct Hasher {
+            std::size_t operator()(const ChartHandle& ch) const
+            {
+                return std::hash<RegionID>()(ch->id);
+            }
+        };
+
+        struct Cache {
+            double areaUV;
+            double area3D;
+            double borderUV;
+            double border3D;
+            vcg::Point3d weightedSumNormal;
+            bool uvFlipped;
+        };
+
+        void UpdateCache() const;
+
+        Mesh& mesh;
+        RegionID id;
+        std::vector<Mesh::FacePointer> fpVec;
+        std::unordered_set<ChartHandle, Hasher> adj;
+
+        int numMerges;
+
+        float minMappedFaceValue;
+        float maxMappedFaceValue;
+
+        double error;
+
+        mutable bool dirty;
+        mutable Cache cache;
+
+        FaceGroup(Mesh& m, const RegionID id_);
+
+        void Clear();
+        void AddFace(const Mesh::FacePointer fptr);
+        void ParameterizationChanged();
+        Mesh::FacePointer Fp();
+
+        vcg::Point3d AverageNormal() const;
+
+        std::size_t FN() const;
+        std::size_t NumAdj() const;
+        double OriginalAreaUV() const;
+        double AreaUV() const;
+        double Area3D() const;
+        double BorderUV() const;
+        double Border3D() const;
+        bool UVFlipped() const;
+        vcg::Box2d UVBox() const;
+
+        bool UVFlipped();
+
+        void UpdateBorder() const;
     };
 
-    struct Cache {
-        double areaUV;
-        double area3D;
-        double borderUV;
-        double border3D;
-        vcg::Point3d weightedSumNormal;
-        bool uvFlipped;
+    /* Constructs a mesh from a FaceGroup, the created mesh has the FaceIndex
+     * attribute defined (see mesh_attribute.h) */
+    void CopyToMesh(FaceGroup& fg, Mesh& m);
+
+    /* Computes the mesh graph relying on the pre-computed FF adjacency attribute
+     * to determine chart adjacency relations */
+    GraphHandle ComputeGraph(Mesh &m, TextureObjectHandle textureObject);
+
+    /*
+     * MeshGraph class
+     *
+     * The graph is actually stored as an associative array mapping each Region id to the relative FaceGroup, the adjacencies
+     * are recorded inside each FaceGroup
+     */
+    struct MeshGraph {
+
+        Mesh& mesh;
+
+        std::unordered_map<RegionID, ChartHandle> charts;
+        TextureObjectHandle textureObject;
+
+        MeshGraph(Mesh& m);
+        ~MeshGraph();
+
+        /* compute the minmax distortion of the graph */
+        std::pair<float,float> DistortionRange() const;
+
+        /* Retrieve region i (ensure if not found) */
+        std::shared_ptr<FaceGroup> GetChart(RegionID i);
+
+        /* Retrieve region i, creating if it is not found */
+        std::shared_ptr<FaceGroup> GetChart_Insert(RegionID i);
+
+        /* Number of regions */
+        std::size_t Count() const;
+
+        /* Number of merges performed on the graph (is it used?) */
+        int MergeCount() const;
+
+        double Area3D() const;
+        double AreaUV() const;
+        double SignedAreaUV() const;
+
+        double MappedFraction() const;
+
+        double BorderUV() const;
+
     };
-
-    void UpdateCache() const;
-
-    Mesh& mesh;
-    RegionID id;
-    std::vector<Mesh::FacePointer> fpVec;
-    std::unordered_set<ChartHandle, Hasher> adj;
-
-    int numMerges;
-
-    float minMappedFaceValue;
-    float maxMappedFaceValue;
-
-    double error;
-
-    mutable bool dirty;
-    mutable Cache cache;
-
-    FaceGroup(Mesh& m, const RegionID id_);
-
-    void Clear();
-    void AddFace(const Mesh::FacePointer fptr);
-    void ParameterizationChanged();
-    Mesh::FacePointer Fp();
-
-    vcg::Point3d AverageNormal() const;
-
-    std::size_t FN() const;
-    std::size_t NumAdj() const;
-    double OriginalAreaUV() const;
-    double AreaUV() const;
-    double Area3D() const;
-    double BorderUV() const;
-    double Border3D() const;
-    bool UVFlipped() const;
-    vcg::Box2d UVBox() const;
-
-    bool UVFlipped();
-
-    void UpdateBorder() const;
-};
-
-/* Constructs a mesh from a FaceGroup, the created mesh has the FaceIndex
- * attribute defined (see mesh_attribute.h) */
-void CopyToMesh(FaceGroup& fg, Mesh& m);
-
-/* Computes the mesh graph relying on the pre-computed FF adjacency attribute
- * to determine chart adjacency relations */
-GraphHandle ComputeGraph(Mesh &m, TextureObjectHandle textureObject);
-
-/*
- * MeshGraph class
- *
- * The graph is actually stored as an associative array mapping each Region id to the relative FaceGroup, the adjacencies
- * are recorded inside each FaceGroup
- */
-struct MeshGraph {
-
-    Mesh& mesh;
-
-    std::unordered_map<RegionID, ChartHandle> charts;
-    TextureObjectHandle textureObject;
-
-    MeshGraph(Mesh& m);
-    ~MeshGraph();
-
-    /* compute the minmax distortion of the graph */
-    std::pair<float,float> DistortionRange() const;
-
-    /* Retrieve region i (ensure if not found) */
-    std::shared_ptr<FaceGroup> GetChart(RegionID i);
-
-    /* Retrieve region i, creating if it is not found */
-    std::shared_ptr<FaceGroup> GetChart_Insert(RegionID i);
-
-    /* Number of regions */
-    std::size_t Count() const;
-
-    /* Number of merges performed on the graph (is it used?) */
-    int MergeCount() const;
-
-    double Area3D() const;
-    double AreaUV() const;
-    double SignedAreaUV() const;
-
-    double MappedFraction() const;
-
-    double BorderUV() const;
-
-};
+}
 
 #endif // MESH_GRAPH_H

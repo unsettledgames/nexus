@@ -22,32 +22,34 @@
 #ifndef SHELL_H
 #define SHELL_H
 
-class Mesh;
-class FaceGroup;
+namespace Defrag
+{
+    class Mesh;
+    class FaceGroup;
 
-/* Builds a shell for the given chart. A shell is a mesh object specifically
- * constructed to compute the parameterization of a chart. In order to support
- * the various operations that we need to perform on it, it is more convenient
- * to keep its shape as the current 2D parameter-space configuration (possibly
- * not updated). The shell has suitable attributes to retrieve information about
- * the shell-face to input mesh-face mappings, as well as the target shape
- * features of each face to guide the parameterization process. (See also the
- * comments in mesh_attribute.h). */
-bool BuildShellWithTargetsFromUV(Mesh& shell, FaceGroup& fg, double downscaleFactor);
+    /* Builds a shell for the given chart. A shell is a mesh object specifically
+     * constructed to compute the parameterization of a chart. In order to support
+     * the various operations that we need to perform on it, it is more convenient
+     * to keep its shape as the current 2D parameter-space configuration (possibly
+     * not updated). The shell has suitable attributes to retrieve information about
+     * the shell-face to input mesh-face mappings, as well as the target shape
+     * features of each face to guide the parameterization process. (See also the
+     * comments in mesh_attribute.h). */
+    bool BuildShellWithTargetsFromUV(Mesh& shell, FaceGroup& fg, double downscaleFactor);
 
-void CloseHoles3D(Mesh& shell);
+    void CloseHoles3D(Mesh& shell);
 
-/* This function synchronizes a shell with its UV coordinates, that is it
- * updates its vertex coordinates to match the parameter space configurations
- * (with z = 0). The operation is performed per-vertex. */
-void SyncShellWithUV(Mesh& shell);
+    /* This function synchronizes a shell with its UV coordinates, that is it
+     * updates its vertex coordinates to match the parameter space configurations
+     * (with z = 0). The operation is performed per-vertex. */
+    void SyncShellWithUV(Mesh& shell);
 
-/* This function synchronizes a shell with the model space coordinates of its
- * chart. */
-void SyncShellWith3D(Mesh& shell);
+    /* This function synchronizes a shell with the model space coordinates of its
+     * chart. */
+    void SyncShellWith3D(Mesh& shell);
 
-/* Removes any hole-filling face from the shell and compacts its containers */
-void ClearHoleFillingFaces(Mesh& shell, bool holefill, bool scaffold);
-
+    /* Removes any hole-filling face from the shell and compacts its containers */
+    void ClearHoleFillingFaces(Mesh& shell, bool holefill, bool scaffold);
+}
 
 #endif // SHELL_H

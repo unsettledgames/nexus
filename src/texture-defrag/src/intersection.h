@@ -30,26 +30,29 @@
 
 #include "mesh.h"
 
-struct HalfEdge {
-    Mesh::FacePointer fp;
-    int e;
+namespace Defrag
+{
+    struct HalfEdge {
+        Mesh::FacePointer fp;
+        int e;
 
-    vcg::Point2d P0() const { return fp->V0(e)->T().P(); }
-    vcg::Point2d P1() const { return fp->V1(e)->T().P(); }
+        vcg::Point2d P0() const { return fp->V0(e)->T().P(); }
+        vcg::Point2d P1() const { return fp->V1(e)->T().P(); }
 
-	Mesh::VertexPointer V0() const { return fp->V0(e); }
-	Mesh::VertexPointer V1() const { return fp->V1(e); }
+        Mesh::VertexPointer V0() const { return fp->V0(e); }
+        Mesh::VertexPointer V1() const { return fp->V1(e); }
 
-    bool operator<(const HalfEdge& other) const { return (fp < other.fp) || (fp == other.fp && e < other.e); }
-    bool operator==(const HalfEdge& other) const { return fp == other.fp && e == other.e; }
-};
+        bool operator<(const HalfEdge& other) const { return (fp < other.fp) || (fp == other.fp && e < other.e); }
+        bool operator==(const HalfEdge& other) const { return fp == other.fp && e == other.e; }
+    };
 
-typedef vcg::Segment2d Segment;
-typedef std::pair<HalfEdge, HalfEdge> HalfEdgePair;
+    typedef vcg::Segment2d Segment;
+    typedef std::pair<HalfEdge, HalfEdge> HalfEdgePair;
 
-bool SegmentBoxIntersection(const Segment& seg, const vcg::Box2d& box);
+    bool SegmentBoxIntersection(const Segment& seg, const vcg::Box2d& box);
 
-std::vector<HalfEdgePair> Intersection(const std::vector<HalfEdge>& heVec);
-std::vector<HalfEdgePair> CrossIntersection(const std::vector<HalfEdge>& heVec1, const std::vector<HalfEdge>& heVec2);
+    std::vector<HalfEdgePair> Intersection(const std::vector<HalfEdge>& heVec);
+    std::vector<HalfEdgePair> CrossIntersection(const std::vector<HalfEdge>& heVec1, const std::vector<HalfEdge>& heVec2);
+}
 
 #endif // INTERSECTION_H

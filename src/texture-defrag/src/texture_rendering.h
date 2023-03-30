@@ -27,18 +27,21 @@
 
 #include <vector>
 
-class Mesh;
-class MeshFace;
+namespace Defrag
+{
+    class Mesh;
+    class MeshFace;
 
-enum RenderMode {
-    Nearest, Linear, Cubic, FaceColor
-};
+    enum RenderMode {
+        Nearest, Linear, Cubic, FaceColor
+    };
 
-int FacesByTextureIndex(Mesh& m, std::vector<std::vector<Mesh::FacePointer>>& fv);
+    int FacesByTextureIndex(Mesh& m, std::vector<std::vector<Mesh::FacePointer>>& fv);
 
-std::vector<std::shared_ptr<QImage>>
-RenderTexture(Mesh& m, TextureObjectHandle textureObject, const std::vector<TextureSize> &texSizes,
-              bool filter, RenderMode imode);
+    std::vector<std::shared_ptr<QImage>>
+    RenderTexture(Mesh& m, TextureObjectHandle textureObject, const std::vector<TextureSize> &texSizes,
+                  bool filter, RenderMode imode);
+}
 
 #endif // TEXTURE_RENDERING_H
 

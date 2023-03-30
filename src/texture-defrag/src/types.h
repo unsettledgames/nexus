@@ -26,39 +26,42 @@
 #include <vector>
 #include <vcg/space/point2.h>
 
-class Mesh;
-class MeshVertex;
-class MeshFace;
-class MeshEdge;
+namespace Defrag
+{
+    class Mesh;
+    class MeshVertex;
+    class MeshFace;
+    class MeshEdge;
 
-class SeamMesh;
-class SeamEdge;
-class SeamVertex;
+    class SeamMesh;
+    class SeamEdge;
+    class SeamVertex;
 
-typedef int RegionID;
-constexpr RegionID INVALID_ID = 0xffffffff;
+    typedef int RegionID;
+    constexpr RegionID INVALID_ID = 0xffffffff;
 
-class MeshGraph;
-class FaceGroup;
-class TextureObject;
+    class MeshGraph;
+    class FaceGroup;
+    class TextureObject;
 
-class AlgoState;
-class Seam;
-class ClusteredSeam;
+    class AlgoState;
+    class Seam;
+    class ClusteredSeam;
 
-typedef std::shared_ptr<MeshGraph>       GraphHandle;
-typedef std::shared_ptr<FaceGroup>       ChartHandle;
-typedef std::shared_ptr<TextureObject>   TextureObjectHandle;
-typedef std::shared_ptr<Seam>            SeamHandle;
-typedef std::shared_ptr<ClusteredSeam>   ClusteredSeamHandle;
-typedef std::shared_ptr<AlgoState>       AlgoStateHandle;
-typedef std::shared_ptr<const AlgoState> ConstAlgoStateHandle;
+    typedef std::shared_ptr<MeshGraph>       GraphHandle;
+    typedef std::shared_ptr<FaceGroup>       ChartHandle;
+    typedef std::shared_ptr<TextureObject>   TextureObjectHandle;
+    typedef std::shared_ptr<Seam>            SeamHandle;
+    typedef std::shared_ptr<ClusteredSeam>   ClusteredSeamHandle;
+    typedef std::shared_ptr<AlgoState>       AlgoStateHandle;
+    typedef std::shared_ptr<const AlgoState> ConstAlgoStateHandle;
 
-typedef std::vector<vcg::Point2f> Outline2f;
-typedef std::vector<vcg::Point2d> Outline2d;
+    typedef std::vector<vcg::Point2f> Outline2f;
+    typedef std::vector<vcg::Point2d> Outline2d;
 
-typedef std::pair<ClusteredSeamHandle, double> WeightedSeam;
+    typedef std::pair<ClusteredSeamHandle, double> WeightedSeam;
 
-class TextureSize;
+    class TextureSize;
+}
 
 #endif // TYPES_H

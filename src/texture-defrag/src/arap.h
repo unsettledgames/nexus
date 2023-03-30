@@ -27,53 +27,56 @@
 #include <Eigen/Core>
 #include <Eigen/Sparse>
 
-
-struct ARAPSolveInfo {
-    double initialEnergy;
-    double finalEnergy;
-    int iterations;
-    bool numericalError;
-};
-
-class ARAP {
-
-public:
-
-    struct Cot {
-        double v[3];
+namespace Defrag
+{
+    struct ARAPSolveInfo {
+        double initialEnergy;
+        double finalEnergy;
+        int iterations;
+        bool numericalError;
     };
 
-private:
+    class ARAP {
 
-    Mesh& m;
+    public:
 
-    std::vector<int> fixed_i;
-    std::vector<vcg::Point2d> fixed_pos;
+        struct Cot {
+            double v[3];
+        };
 
-    int max_iter;
+    private:
 
-    void ComputeSystemMatrix(Mesh& m, const std::vector<Cot>& cotan, Eigen::SparseMatrix<double>& L);
-    void ComputeRHS(Mesh& m, const std::vector<Eigen::Matrix2d>& rotations, const std::vector<Cot>& cotan, Eigen::VectorXd& bu, Eigen::VectorXd& bv);
+        Mesh& m;
 
-public:
+        std::vector<int> fixed_i;
+        std::vector<vcg::Point2d> fixed_pos;
 
-    ARAP(Mesh& mesh);
+        int max_iter;
 
-    double CurrentEnergy();
-    void FixVertex(Mesh::ConstVertexPointer vp, const vcg::Point2d& pos);
-    void FixBoundaryVertices();
-    int FixSelectedVertices();
-    int FixRandomEdgeWithinTolerance(double tol);
-    void SetMaxIterations(int n);
+        void ComputeSystemMatrix(Mesh& m, const std::vector<Cot>& cotan, Eigen::SparseMatrix<double>& L);
+        void ComputeRHS(Mesh& m, const std::vector<Eigen::Matrix2d>& rotations, const std::vector<Cot>& cotan, Eigen::VectorXd& bu, Eigen::VectorXd& bv);
 
-    ARAPSolveInfo Solve();
+    public:
 
-    static double ComputeEnergyFromStoredWedgeTC(Mesh& m, double *num, double *denom);
-    static double ComputeEnergyFromStoredWedgeTC(const std::vector<Mesh::FacePointer>& fpVec, Mesh& m, double *num, double *denom);
-    static double ComputeEnergy(const vcg::Point2d& x10, const vcg::Point2d& x20,
-                                const vcg::Point2d& u10, const vcg::Point2d& u20,
-                                double *area);
-};
+        ARAP(Mesh& mesh);
+
+        double CurrentEnergy();
+        void FixVertex(Mesh::ConstVertexPointer vp, const vcg::Point2d& pos);
+        void FixBoundaryVertices();
+        int FixSelectedVertices();
+        int FixRandomEdgeWithinTolerance(double tol);
+        void SetMaxIterations(int n);
+
+        ARAPSolveInfo Solve();
+
+        static double ComputeEnergyFromStoredWedgeTC(Mesh& m, double *num, double *denom);
+        static double ComputeEnergyFromStoredWedgeTC(const std::vector<Mesh::FacePointer>& fpVec, Mesh& m, double *num, double *denom);
+        static double ComputeEnergy(const vcg::Point2d& x10, const vcg::Point2d& x20,
+                                    const vcg::Point2d& u10, const vcg::Point2d& u20,
+                                    double *area);
+    };
+}
+
 
 
 #endif // ARAP_H

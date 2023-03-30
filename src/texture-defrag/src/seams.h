@@ -28,38 +28,41 @@
 #include "types.h"
 #include "mesh_graph.h"
 
-struct Seam {
-    SeamMesh& sm;
-    std::vector<int> edges; // the list of seam segment edges
-    std::vector<int> endpoints; // the two endpoint vertices
+namespace Defrag
+{
+    struct Seam {
+        SeamMesh& sm;
+        std::vector<int> edges; // the list of seam segment edges
+        std::vector<int> endpoints; // the two endpoint vertices
 
-    Seam(SeamMesh& m) : sm{m} {}
-};
+        Seam(SeamMesh& m) : sm{m} {}
+    };
 
-struct ClusteredSeam {
-    SeamMesh& sm;
-    std::vector<SeamHandle> seams;
+    struct ClusteredSeam {
+        SeamMesh& sm;
+        std::vector<SeamHandle> seams;
 
-    ClusteredSeam(SeamMesh& m) : sm{m} {}
-    std::size_t size() { return seams.size(); }
-    SeamHandle at(int i) { return seams.at(i); }
-};
+        ClusteredSeam(SeamMesh& m) : sm{m} {}
+        std::size_t size() { return seams.size(); }
+        SeamHandle at(int i) { return seams.at(i); }
+    };
 
-ChartPair GetCharts(ClusteredSeamHandle csh, GraphHandle graph, bool *swapped = nullptr);
-std::set<int> GetEndpoints(ClusteredSeamHandle csh);
+    ChartPair GetCharts(ClusteredSeamHandle csh, GraphHandle graph, bool *swapped = nullptr);
+    std::set<int> GetEndpoints(ClusteredSeamHandle csh);
 
-void ColorizeSeam(ClusteredSeamHandle csh, const vcg::Color4b& color);
-void ColorizeSeam(SeamHandle sh, const vcg::Color4b& color);
+    void ColorizeSeam(ClusteredSeamHandle csh, const vcg::Color4b& color);
+    void ColorizeSeam(SeamHandle sh, const vcg::Color4b& color);
 
-double ComputeSeamLength3D(ClusteredSeamHandle csh);
-double ComputeSeamLength3D(SeamHandle sh);
+    double ComputeSeamLength3D(ClusteredSeamHandle csh);
+    double ComputeSeamLength3D(SeamHandle sh);
 
-// a is a set of ids that logically describe one side of the seam (whose coordinates are inserted in uva)
-void ExtractUVCoordinates(ClusteredSeamHandle csh, std::vector<Point2d>& uva, std::vector<Point2d>& uvb, const std::unordered_set<RegionID>& a);
+    // a is a set of ids that logically describe one side of the seam (whose coordinates are inserted in uva)
+    void ExtractUVCoordinates(ClusteredSeamHandle csh, std::vector<Point2d>& uva, std::vector<Point2d>& uvb, const std::unordered_set<RegionID>& a);
 
-void BuildSeamMesh(Mesh& m, SeamMesh& seamMesh);
-std::vector<SeamHandle> GenerateSeams(SeamMesh& seamMesh);
-std::vector<ClusteredSeamHandle> ClusterSeamsByChartId(const std::vector<SeamHandle>& seams);
-ClusteredSeamHandle Flatten(const std::vector<ClusteredSeamHandle>& cshVec);
+    void BuildSeamMesh(Mesh& m, SeamMesh& seamMesh);
+    std::vector<SeamHandle> GenerateSeams(SeamMesh& seamMesh);
+    std::vector<ClusteredSeamHandle> ClusterSeamsByChartId(const std::vector<SeamHandle>& seams);
+    ClusteredSeamHandle Flatten(const std::vector<ClusteredSeamHandle>& cshVec);
+}
 
 #endif // SEAMS_H

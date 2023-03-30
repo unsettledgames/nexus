@@ -27,27 +27,28 @@
 #include <vector>
 #include <map>
 
+namespace Defrag
+{
+    /* Pack the texture atlas encoded in the graph. Assumes the segmentation
+     * correctly reflects the texture coordinates.
+     * Returns the actual number of charts packed */
+    int Pack(const std::vector<ChartHandle>& charts, TextureObjectHandle textureObject, std::vector<TextureSize>& texszVec);
 
-/* Pack the texture atlas encoded in the graph. Assumes the segmentation
- * correctly reflects the texture coordinates.
- * Returns the actual number of charts packed */
-int Pack(const std::vector<ChartHandle>& charts, TextureObjectHandle textureObject, std::vector<TextureSize>& texszVec);
-
-/* Computes the UV outline(s) of the given chart. If the chart has no outlines,
- * which can happen for some inputs on small closed components that are ignored
- * by the reparameterization procedure, it returns as outline the bounding box
- * of the chart texture coordinates.
- * NOTE: It assumes the face-face topology is computed according to the wedge
- * texture coordinates of the chart/mesh */
-Outline2f ExtractOutline2f(FaceGroup& chart);
-Outline2d ExtractOutline2d(FaceGroup& chart);
+    /* Computes the UV outline(s) of the given chart. If the chart has no outlines,
+     * which can happen for some inputs on small closed components that are ignored
+     * by the reparameterization procedure, it returns as outline the bounding box
+     * of the chart texture coordinates.
+     * NOTE: It assumes the face-face topology is computed according to the wedge
+     * texture coordinates of the chart/mesh */
+    Outline2f ExtractOutline2f(FaceGroup& chart);
+    Outline2d ExtractOutline2d(FaceGroup& chart);
 
 
-void IntegerShift(Mesh& m,
-                  const std::vector<ChartHandle>& chartsToPack,
-                  const std::vector<TextureSize>& texszVec,
-                  const std::map<ChartHandle, int>& anchorMap,
-                  const std::map<RegionID, bool>& flippedInput);
-
+    void IntegerShift(Mesh& m,
+                      const std::vector<ChartHandle>& chartsToPack,
+                      const std::vector<TextureSize>& texszVec,
+                      const std::map<ChartHandle, int>& anchorMap,
+                      const std::map<RegionID, bool>& flippedInput);
+}
 
 #endif // PACKING_H
