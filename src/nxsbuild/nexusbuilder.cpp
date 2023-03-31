@@ -28,6 +28,7 @@ for more details.
 #include "nexusbuilder.h"
 #include "kdtree.h"
 #include "meshstream.h"
+// Nexus meshes
 #include "mesh.h"
 #include "tmesh.h"
 #include "../common/nexus.h"
