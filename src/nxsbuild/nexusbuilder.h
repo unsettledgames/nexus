@@ -90,6 +90,11 @@ public:
 	void createCloudLevel(KDTreeCloud *input, StreamCloud *output, int level);
 	void createMeshLevel(KDTreeSoup *input, StreamSoup *output, int level);
 
+    void setOriginalTextures(std::vector<LoadTexture>& textures)
+    {
+        for (auto& tex : textures)
+            originalTextures.push_back(QImage(tex.filename));
+    }
 
 	void setMaxMemory(quint64 m) {
 		max_memory = m;
@@ -124,6 +129,7 @@ public:
 	std::vector<nx::Patch> patches;
 	std::vector<nx::Texture> textures;
 	std::vector<QString> images;
+    std::vector<QImage> originalTextures;
 
 	quint64 input_pixels, output_pixels;
     nx::TexAtlas atlas;
@@ -143,7 +149,7 @@ public:
 
 	void processBlock(KDTreeSoup *input, StreamSoup *output, uint block, int level);
 
-    QImage extractNodeTex(TMesh &mesh, std::vector<Texture>& toDefrag, int level, float &error, float &pixelXedge);
+    QImage extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, int level, float &error, float &pixelXedge);
 	void invertNodes(); //
 	void saturateNode(quint32 n);
 	void optimizeNode(quint32 node, uchar *chunk);

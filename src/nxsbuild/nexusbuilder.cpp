@@ -213,7 +213,7 @@ namespace nx
 
     };
 
-    QImage NexusBuilder::extractNodeTex(TMesh &mesh, std::vector<Texture>& toDefrag, int level, float &error, float &pixelXedge) {
+    QImage NexusBuilder::extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, int level, float &error, float &pixelXedge) {
         cout << "Extracting textures" << endl;
         // Set default parameters for defragmenter
         Defrag::AlgoParameters ap;
@@ -226,33 +226,9 @@ namespace nx
         ap.offsetFactor = 5;
         ap.timelimit = 0;
 
-        // Load texture data
-        std::vector<QImage> texImages(toDefrag.size());
-
-        uint64_t currOffset = toDefrag[0].getBeginOffset();
-        for (uint32_t i=0; i<toDefrag.size()-1; i++)
-        {
-            uint32_t dataSize = toDefrag[i].getSize();
-            nodeTex.seek(currOffset);
-
-            uint8_t* data;
-            if (i < toDefrag.size()-1)
-                data = (uint8_t*)nodeTex.read(dataSize).data();
-            else
-                data = (uint8_t*)nodeTex.read(nodeTex.size() - currOffset).data();
-
-            texImages[i] = QImage();
-            texImages[i].loadFromData(data, dataSize);
-            // Convert format if necessary
-            if (texImages[i].format() != QImage::Format_RGB888)
-                texImages[i].convertToFormat(QImage::Format_RGB888);
-
-            currOffset += toDefrag[i].getSize();
-        }
-
         // Finally create TextureObject
         Defrag::TextureObjectHandle textureObject = std::make_shared<Defrag::TextureObject>();
-        for (auto& img : texImages)
+        for (auto& img : toDefrag)
             textureObject->AddImage(img);
         cout << "loaded textures" << endl;
 
@@ -286,7 +262,7 @@ namespace nx
 
         for (int i = 0; i < mesh.FN(); ++i) {
             for (int k = 0; k < 3; ++k) {
-                fi->V(k) = &defragMesh.vert[mesh.face[i].cV(k)->VFi()];
+                fi->V(k) = &defragMesh.vert[0];
                 fi->WT(k).U() = mesh.face[i].cWT(k).U();
                 fi->WT(k).V() = mesh.face[i].cWT(k).V();
                 fi->WT(k).N() = mesh.face[i].cWT(k).N();
@@ -485,31 +461,13 @@ namespace nx
         }
 
 
-
         if(!hasTextures()) {
             //no need to mutex the input, it won't change anything.
             input->lock(mesh1, block);
             mesh_size = mesh1.serializedSize(header.signature);
 
         } else {
-
-            input->lock(mesh, block);
-            //we need to replicate vertices where textured seams occours
-
-            vcg::tri::Append<TMesh,TMesh>::MeshCopy(tmp,mesh);
-            for(int i = 0; i < tmp.face.size(); i++) {
-                tmp.face[i].node = mesh.face[i].node;
-                tmp.face[i].tex = mesh.face[i].tex;
-            }
-            tmp.splitSeams(header.signature);
-            if(tmp.vert.size() > 60000) {
-                cerr << "Unable to properly simplify due to fragmented parametrization\n"
-                     << "Try to reduce the size of the nodes using -f (default is 32768)" << endl;
-                exit(0);
-            }
-
-            //save node in nexus temporary structure
-            mesh_size = tmp.serializedSize(header.signature);
+            mesh_size = mesh.serializedSize(header.signature);
         }
         mesh_size = pad(mesh_size);
         uchar *buffer = new uchar[mesh_size];
@@ -524,13 +482,43 @@ namespace nx
 
             if(useNodeTex) {
                 mesh.serialize(buffer, header.signature, node_patches);
-                // Get used textures
-                std::vector<Texture> toDefrag;
-                for (auto& patch : node_patches)
-                    toDefrag.push_back(textures[patch.texture]);
 
-                // Defragment textures
-                QImage nodetex = extractNodeTex(mesh, toDefrag, level, error, pixelXedge);
+                // Load texture data
+                QImage nodetex;
+                if (level == 0)
+                    nodetex = extractNodeTex(mesh, originalTextures, level, error, pixelXedge);
+                else
+                {
+                    // Get used textures
+                    std::vector<Texture> toDefrag;
+                    for (auto& patch : node_patches)
+                        toDefrag.push_back(textures[patch.texture]);
+
+                    std::vector<QImage> texImages(toDefrag.size());
+                    uint64_t currOffset = toDefrag[0].getBeginOffset();
+
+                    for (uint32_t i=0; i<toDefrag.size()-1; i++)
+                    {
+                        uint32_t dataSize = toDefrag[i].getSize();
+                        nodeTex.seek(currOffset);
+
+                        uint8_t* data;
+                        if (i < toDefrag.size()-1)
+                            data = (uint8_t*)nodeTex.read(dataSize).data();
+                        else
+                            data = (uint8_t*)nodeTex.read(nodeTex.size() - currOffset).data();
+
+                        texImages[i] = QImage();
+                        texImages[i].loadFromData(data, dataSize);
+                        // Convert format if necessary
+                        if (texImages[i].format() != QImage::Format_RGB888)
+                            texImages[i].convertToFormat(QImage::Format_RGB888);
+
+                        currOffset += toDefrag[i].getSize();
+                    }
+
+                    nodetex = extractNodeTex(mesh, texImages, level, error, pixelXedge);
+                }
 
                 Texture t;
                 {

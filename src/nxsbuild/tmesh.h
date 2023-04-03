@@ -97,6 +97,7 @@ namespace nx
     class TFace: public vcg::Face<
             TUsedTypes,
             vcg::face::VFAdj,
+            vcg::face::FFAdj,
             vcg::face::VertexRef,
             vcg::face::Normal3f,
             vcg::face::WedgeTexCoord2f,

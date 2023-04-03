@@ -403,7 +403,6 @@ namespace nx
             }
         }
 
-
         nx::Patch patch;
         patch.node = current_node;
         if(sig.face.hasIndex()) {

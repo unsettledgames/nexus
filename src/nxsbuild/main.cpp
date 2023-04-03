@@ -176,137 +176,140 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	Stream *stream = 0;
-	KDTree *tree = 0;
-	int returncode = 0;
-	try {
-		quint64 max_memory = (1<<20)*(uint64_t)ram_buffer/4; //hack 4 is actually an estimate...
+    Stream *stream = 0;
+    KDTree *tree = 0;
+    int returncode = 0;
+    try {
+        quint64 max_memory = (1<<20)*(uint64_t)ram_buffer/4; //hack 4 is actually an estimate...
 
-		//autodetect point cloud ply
-		if(inputs[0].endsWith(".ply")) {
-			PlyLoader autodetect(inputs[0]);
-			if(autodetect.nTriangles() == 0)
-				point_cloud = true;
-		}
+        //autodetect point cloud ply
+        if(inputs[0].endsWith(".ply")) {
+            PlyLoader autodetect(inputs[0]);
+            if(autodetect.nTriangles() == 0)
+                point_cloud = true;
+        }
 
-		string input = "mesh";
+        string input = "mesh";
 
-		if (point_cloud) {
-			input = "pointcloud";
-			stream = new StreamCloud("cache_stream");
-		}
-		else
-			stream = new StreamSoup("cache_stream");
+        if (point_cloud) {
+            input = "pointcloud";
+            stream = new StreamCloud("cache_stream");
+        }
+        else
+            stream = new StreamSoup("cache_stream");
 
-		stream->setVertexQuantization(vertex_quantization);
-		stream->setMaxMemory(max_memory);
-		if(center) {
-			vcg::Box3d box = stream->getBox(inputs);
-			vcg::Point3d m = box.min;
-			vcg::Point3d M = box.max;
-			cout << setprecision(12) << "Box: " << m[0] << " " << m[1] << " " << m[2] << "  --- " << M[0] << " " << M[1] << " " << M[2] << endl;
-			stream->origin = box.Center();
-		} else
-			stream->origin = origin;
+        stream->setVertexQuantization(vertex_quantization);
+        stream->setMaxMemory(max_memory);
+        if(center) {
+            vcg::Box3d box = stream->getBox(inputs);
+            vcg::Point3d m = box.min;
+            vcg::Point3d M = box.max;
+            cout << setprecision(12) << "Box: " << m[0] << " " << m[1] << " " << m[2] << "  --- " << M[0] << " " << M[1] << " " << M[2] << endl;
+            stream->origin = box.Center();
+        } else
+            stream->origin = origin;
 
-		vcg::Point3d &o = stream->origin;
-		if(o[0] != 0.0 || o[1] != 0.0 || o[2] != 0.0) {
-			int lastPoint = output.lastIndexOf(".");
-			QString ref = output.left(lastPoint) + ".js";
-			QFile file(ref);
-			if(!file.open(QFile::ReadWrite)) {
-				cerr << "Could not save reference file: " << qPrintable(ref) << endl;
-				return -1;
-			}
-			QTextStream stream(&file);
-			stream.setRealNumberPrecision(12);
-			stream << "{ \"origin\": [" << o[0] << ", " << o[1] << ", " << o[2] << "] }\n";
-		}
-		//TODO: actually the stream will store textures or normals or colors even if not needed
-		stream->load(inputs, mtl);
+        vcg::Point3d &o = stream->origin;
+        if(o[0] != 0.0 || o[1] != 0.0 || o[2] != 0.0) {
+            int lastPoint = output.lastIndexOf(".");
+            QString ref = output.left(lastPoint) + ".js";
+            QFile file(ref);
+            if(!file.open(QFile::ReadWrite)) {
+                cerr << "Could not save reference file: " << qPrintable(ref) << endl;
+                return -1;
+            }
+            QTextStream stream(&file);
+            stream.setRealNumberPrecision(12);
+            stream << "{ \"origin\": [" << o[0] << ", " << o[1] << ", " << o[2] << "] }\n";
+        }
+        //TODO: actually the stream will store textures or normals or colors even if not needed
+        stream->load(inputs, mtl);
 
 /*			VcgLoader<Mesh> *loader = new VcgLoader<Mesh>;
-			loader->load(inputs[0], has_colors, has_normals, has_textures);
-			stream->load(loader); */
+            loader->load(inputs[0], has_colors, has_normals, has_textures);
+            stream->load(loader); */
 
 
-		bool has_colors = stream->hasColors();
-		bool has_normals = stream->hasNormals();
-		bool has_textures = stream->hasTextures();
+        bool has_colors = stream->hasColors();
+        bool has_normals = stream->hasNormals();
+        bool has_textures = stream->hasTextures();
 
-		cout << "Components: " << input;
-		if(has_normals) cout << " normals";
-		if(has_colors) cout << " colors";
-		if(has_textures) cout << " textures";
-		cout << "\n";
+        cout << "Components: " << input;
+        if(has_normals) cout << " normals";
+        if(has_colors) cout << " colors";
+        if(has_textures) cout << " textures";
+        cout << "\n";
 
-		quint32 components = 0;
-		if(!point_cloud) components |= NexusBuilder::FACES;
+        quint32 components = 0;
+        if(!point_cloud) components |= NexusBuilder::FACES;
 
-		if((!no_normals && (!point_cloud || has_normals)) || normals) {
-			components |= NexusBuilder::NORMALS;
-			cout << "Normals enabled\n";
-		}
-		if((has_colors  && !no_colors ) || colors ) {
-			components |= NexusBuilder::COLORS;
-			cout << "Colors enabled\n";
-		}
-		if(has_textures && !no_texcoords) {
-			components |= NexusBuilder::TEXTURES;
-			cout << "Textures enabled\n";
-		}
+        if((!no_normals && (!point_cloud || has_normals)) || normals) {
+            components |= NexusBuilder::NORMALS;
+            cout << "Normals enabled\n";
+        }
+        if((has_colors  && !no_colors ) || colors ) {
+            components |= NexusBuilder::COLORS;
+            cout << "Colors enabled\n";
+        }
+        if(has_textures && !no_texcoords) {
+            components |= NexusBuilder::TEXTURES;
+            cout << "Textures enabled\n";
+        }
 
-		//WORKAROUND to save loading textures not needed
-		if(!(components & NexusBuilder::TEXTURES)) {
-			stream->textures.clear();
-		}
+        //WORKAROUND to save loading textures not needed
+        if(!(components & NexusBuilder::TEXTURES)) {
+            stream->textures.clear();
+        }
 
-		NexusBuilder builder(components);
-		builder.max_node_triangles = node_size;
-		builder.skipSimplifyLevels = skiplevels;
-		builder.setMaxMemory(max_memory);
-		builder.n_threads = n_threads;
-		builder.setScaling(scaling);
-		builder.useNodeTex = !useOrigTex;
-		builder.createPowTwoTex = create_pow_two_tex;
-		if(deepzoom)
-			builder.header.signature.flags |= nx::Signature::Flags::DEEPZOOM;
-		builder.tex_quality = tex_quality;
-		bool success = builder.initAtlas(stream->textures);
-		if(!success) {
-			cerr << "Exiting" << endl;
-			return 1;
-		}
+        NexusBuilder builder(components);
+        builder.max_node_triangles = node_size;
+        builder.skipSimplifyLevels = skiplevels;
+        builder.setMaxMemory(max_memory);
+        builder.n_threads = n_threads;
+        builder.setScaling(scaling);
+        builder.useNodeTex = !useOrigTex;
+        builder.createPowTwoTex = create_pow_two_tex;
+        if(deepzoom)
+            builder.header.signature.flags |= nx::Signature::Flags::DEEPZOOM;
+        builder.tex_quality = tex_quality;
+        builder.setOriginalTextures(stream->textures);
 
+        /*
+        bool success = builder.initAtlas(stream->textures);
+        if(!success) {
+            cerr << "Exiting" << endl;
+            return 1;
+        }
+        */
 
-		if(point_cloud)
-			tree = new KDTreeCloud("cache_tree", adaptive.toFloat());
-		else
-			tree = new KDTreeSoup("cache_tree", adaptive.toFloat());
+        if(point_cloud)
+            tree = new KDTreeCloud("cache_tree", adaptive.toFloat());
+        else
+            tree = new KDTreeSoup("cache_tree", adaptive.toFloat());
 
-		tree->setMaxMemory((1<<20)*(uint64_t)ram_buffer/2);
-		KDTreeSoup *treesoup = dynamic_cast<KDTreeSoup *>(tree);
-		if(treesoup) {
-			treesoup->setMaxWeight(node_size);
-			treesoup->texelWeight = texel_weight;
-			treesoup->setTrianglesPerBlock(node_size);
-		}
+        tree->setMaxMemory((1<<20)*(uint64_t)ram_buffer/2);
+        KDTreeSoup *treesoup = dynamic_cast<KDTreeSoup *>(tree);
+        if(treesoup) {
+            treesoup->setMaxWeight(node_size);
+            treesoup->texelWeight = texel_weight;
+            treesoup->setTrianglesPerBlock(node_size);
+        }
 
-		KDTreeCloud *treecloud = dynamic_cast<KDTreeCloud *>(tree);
-		if(treecloud)
-			treecloud->setTrianglesPerBlock(node_size);
+        KDTreeCloud *treecloud = dynamic_cast<KDTreeCloud *>(tree);
+        if(treecloud)
+            treecloud->setTrianglesPerBlock(node_size);
 
-		builder.create(tree, stream,  top_node_size);
-		builder.save(output);
+        builder.create(tree, stream,  top_node_size);
+        builder.save(output);
 
-	} catch(QString error) {
-		cerr << "Fatal error: " << qPrintable(error) << endl;
-		returncode = 1;
+    } catch(QString error) {
+        cerr << "Fatal error: " << qPrintable(error) << endl;
+        returncode = 1;
 
-	} catch(const char *error) {
-		cerr << "Fatal error: " << error << endl;
-		returncode = 1;
-	}
+    } catch(const char *error) {
+        cerr << "Fatal error: " << error << endl;
+        returncode = 1;
+    }
 
 	if(tree)   delete tree;
 	if(stream) delete stream;
