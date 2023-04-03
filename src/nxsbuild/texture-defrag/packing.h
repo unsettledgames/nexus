@@ -27,6 +27,7 @@
 #include <vector>
 #include <map>
 
+
 namespace Defrag
 {
     /* Pack the texture atlas encoded in the graph. Assumes the segmentation

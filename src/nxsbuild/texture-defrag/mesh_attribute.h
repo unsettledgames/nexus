@@ -25,6 +25,7 @@
 #include "defrag_mesh.h"
 #include "utils.h"
 
+
 namespace Defrag
 {
     struct TexCoordStorage {
@@ -71,6 +72,13 @@ namespace Defrag
         int f[3]; // opposite face index
         int e[3]; // opposite edge index
     };
+
+    inline bool IsEdgeManifold3D(Mesh& m, const MeshFace& f, int i, Mesh::PerFaceAttributeHandle<FF>& ffadj)
+    {
+        const MeshFace& ff = m.face[ffadj[f].f[i]]; // opposite face
+        int ffi = ffadj[f].e[i]; // opposite index
+        return tri::Index(m, f) == ffadj[ff].f[ffi];
+    }
 
     inline Mesh::PerFaceAttributeHandle<FF> Get3DFaceAdjacencyAttribute(Mesh& m);
     inline Mesh::PerFaceAttributeHandle<TexCoordStorage> GetWedgeTexCoordStorageAttribute(Mesh& m);

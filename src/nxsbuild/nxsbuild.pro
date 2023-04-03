@@ -10,7 +10,8 @@ QMAKE_CXXFLAGS += -std=c++11 -g -fpermissive
 INCLUDEPATH += \
     ../../../vcglib \
     ../../../vcglib/eigenlib \
-    ../texture-defrag/texture-defrag
+    ../texture-defrag/texture-defrag \
+    "C:/Program Files/vcpkg/packages/glew_x64-windows/include"
 
 DEFINES += _FILE_OFFSET_BITS=64
 DEFINES += _USE_MATH_DEFINES

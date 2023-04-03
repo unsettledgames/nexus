@@ -45,46 +45,52 @@ namespace Defrag
     {
         QImageReader qir(QString(path.c_str()));
         if (qir.canRead()) {
-            TextureImageInfo tii = {};
-            tii.path = path;
-            tii.size = { qir.size().width(), qir.size().height() };
+            TextureImageInfo tii = {QImage(path.c_str())};
             texInfoVec.push_back(tii);
             texNameVec.push_back(0);
             return true;
         } else return false;
     }
 
+    bool TextureObject::AddImage(const QImage& image)
+    {
+        TextureImageInfo tii = {QImage(image)};
+        texInfoVec.push_back(tii);
+        texNameVec.push_back(0);
+        return true;
+    }
+
     void TextureObject::Bind(int i)
     {
-        OpenGLFunctionsHandle glFuncs = GetOpenGLFunctionsHandle();
         ensure(i >= 0 && i < (int) texInfoVec.size());
         // load texture from qimage on first use
         if (texNameVec[i] == 0) {
-            QImage img(texInfoVec[i].path.c_str());
+            QImage& img = texInfoVec[i].texture;
             ensure(!img.isNull());
             if ((img.format() != QImage::Format_RGB32) || (img.format() != QImage::Format_ARGB32)) {
                 QImage glimg = img.convertToFormat(QImage::Format_ARGB32);
                 img = glimg;
             }
-            glFuncs->glGenTextures(1, &texNameVec[i]);
+            glGenTextures(1, &texNameVec[i]);
 
             Mirror(img);
-            glFuncs->glBindTexture(GL_TEXTURE_2D, texNameVec[i]);
+            glBindTexture(GL_TEXTURE_2D, texNameVec[i]);
             int miplevels = std::log2((float) img.width());
             int width = img.width();
             int height = img.height();
             for (int m = 0; m < miplevels; m++) {
-                glFuncs->glTexImage2D(GL_TEXTURE_2D, m, GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+                glTexImage2D(GL_TEXTURE_2D, m, GL_RGBA8, width, height, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
                 width = std::max(1, (width / 2));
                 height = std::max(1, (height / 2));
             }
-            //glFuncs->glTexStorage2D(GL_TEXTURE_2D, miplevels, GL_RGBA8, img.width(), img.height());
-            glFuncs->glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, img.width(), img.height(), GL_BGRA, GL_UNSIGNED_BYTE, img.constBits());
-            glFuncs->glGenerateMipmap(GL_TEXTURE_2D);
+            //glTexStorage2D(GL_TEXTURE_2D, miplevels, GL_RGBA8, img.width(), img.height());
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, img.width(), img.height(), GL_BGRA, GL_UNSIGNED_BYTE, img.constBits());
+            glGenerateMipmap(GL_TEXTURE_2D);
             CheckGLError();
+            Mirror(img);
         }
         else {
-            glFuncs->glBindTexture(GL_TEXTURE_2D, texNameVec[i]);
+            glBindTexture(GL_TEXTURE_2D, texNameVec[i]);
             CheckGLError();
         }
     }
@@ -93,8 +99,7 @@ namespace Defrag
     {
         ensure(i >= 0 && i < (int) texInfoVec.size());
         if (texNameVec[i]) {
-            OpenGLFunctionsHandle glFuncs = GetOpenGLFunctionsHandle();
-            glFuncs->glDeleteTextures(1, &texNameVec[i]);
+            glDeleteTextures(1, &texNameVec[i]);
             texNameVec[i] = 0;
         }
     }
@@ -102,13 +107,13 @@ namespace Defrag
     int TextureObject::TextureWidth(std::size_t i)
     {
         ensure(i < texInfoVec.size());
-        return texInfoVec[i].size.w;
+        return texInfoVec[i].texture.width();
     }
 
     int TextureObject::TextureHeight(std::size_t i)
     {
         ensure(i < texInfoVec.size());
-        return texInfoVec[i].size.h;
+        return texInfoVec[i].texture.height();
     }
 
     int TextureObject::MaxSize()

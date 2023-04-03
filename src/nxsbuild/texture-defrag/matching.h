@@ -67,4 +67,5 @@ namespace Defrag
     double MatchingErrorTotal(const MatchingTransform& matching, const std::vector<vcg::Point2d>& points1, const std::vector<vcg::Point2d>& points2);
 }
 
+
 #endif // MATCHING_H

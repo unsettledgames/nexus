@@ -25,24 +25,22 @@
 #include <vector>
 #include <memory>
 #include <cstdint>
+#include <string>
 
-#include <QOpenGLFunctions_4_1_Core>
-
-using OpenGLFunctionsVersion = QOpenGLFunctions_4_1_Core;
-using OpenGLFunctionsHandle = OpenGLFunctionsVersion*;
-
-OpenGLFunctionsHandle GetOpenGLFunctionsHandle();
+#include <GL/glew.h>
 
 
-/* Prints the last OpenGL error code */
-void CheckGLError();
+namespace Defrag
+{
+    /* Prints the last OpenGL error code */
+    void CheckGLError();
 
-/* Reads a shader from path into a string and returns it */
-std::string ReadShader(const char *path);
+    /* Reads a shader from path into a string and returns it */
+    std::string ReadShader(const char *path);
 
-/* Compiles a vertex shader source and a fragment shader source into a program */
-uint32_t CompileShaders(const char **vs_text, const char **fs_text);
-
+    /* Compiles a vertex shader source and a fragment shader source into a program */
+    uint32_t CompileShaders(const char **vs_text, const char **fs_text);
+}
 
 #endif // GL_UTIL_H
 

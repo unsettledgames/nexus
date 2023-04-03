@@ -24,23 +24,21 @@
 
 #include <chrono>
 
-namespace Defrag
-{
-    struct Timer {
-        using hrc = std::chrono::high_resolution_clock;
+struct Timer {
+    using hrc = std::chrono::high_resolution_clock;
 
-        hrc::time_point start;
-        hrc::time_point last;
+    hrc::time_point start;
+    hrc::time_point last;
 
-        Timer() : start(hrc::now()) { last = start; }
+    Timer() : start(hrc::now()) { last = start; }
 
-        double TimeElapsed() { last = hrc::now(); return std::chrono::duration<double>(last - start).count(); }
+    double TimeElapsed() { last = hrc::now(); return std::chrono::duration<double>(last - start).count(); }
 
-        double TimeSinceLastCheck() { auto t = last; last = hrc::now(); return std::chrono::duration<double>(last - t).count(); }
+    double TimeSinceLastCheck() { auto t = last; last = hrc::now(); return std::chrono::duration<double>(last - t).count(); }
 
-        void Reset() { start = last = hrc::now(); }
-    };
-}
+    void Reset() { start = last = hrc::now(); }
+
+};
 
 #endif // TIMER_H
 

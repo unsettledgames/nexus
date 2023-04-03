@@ -43,5 +43,6 @@ namespace Defrag
                   bool filter, RenderMode imode);
 }
 
+
 #endif // TEXTURE_RENDERING_H
 

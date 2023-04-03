@@ -31,7 +31,6 @@
 #include <wrap/qt/outline2_rasterizer.h>
 //#include <wrap/qt/Outline2ToQImage.h>
 
-
 namespace Defrag
 {
     typedef vcg::RasterizedOutline2Packer<float, QtOutline2Rasterizer> RasterizationBasedPacker;
@@ -44,7 +43,7 @@ namespace Defrag
 
         std::vector<Outline2f> outlines;
 
-        for (auto c : charts) {
+        for (auto& c : charts) {
             // Save the outline of the parameterization for this portion of the mesh
             Outline2f outline = ExtractOutline2f(*c);
             outlines.push_back(outline);
@@ -206,30 +205,28 @@ namespace Defrag
             }
         }
 
-        int i;
         vcg::Box2d box = chart.UVBox();
-        bool useChartBBAsOutline = false;
 
-        std::size_t maxsz = 0;
-        for (std::size_t i = 0; i < outline2Vec.size(); ++i) {
-            maxsz = std::max(maxsz, outline2Vec[i].size());
-        }
+        int outlineIndex = -1;
+        double largestArea = 0;
 
-        if (maxsz == 0) {
-            useChartBBAsOutline = true;
-        } else {
-            i = (outline2Vec.size() == 1) ? 0 : tri::OutlineUtil<double>::LargestOutline2(outline2Vec);
-            if (tri::OutlineUtil<double>::Outline2Area(outline2Vec[i]) < 0)
+        for (int i = 0; i < outline2Vec.size(); ++i) {
+            double outlineArea = tri::OutlineUtil<double>::Outline2Area(outline2Vec[i]);
+            if (outlineArea < 0)
                 tri::OutlineUtil<double>::ReverseOutline2(outline2Vec[i]);
-            vcg::Box2d outlineBox;
-            for (const auto& p : outline2Vec[i])
-                outlineBox.Add(p);
-            if (outlineBox.DimX() < box.DimX() || outlineBox.DimY() < box.DimY())
-                useChartBBAsOutline = true;
+            if (std::abs(outlineArea) >= largestArea) {
+                vcg::Box2d outlineBox;
+                for (const auto& p : outline2Vec[i])
+                    outlineBox.Add(p);
+                if (outlineBox.DimX() >= box.DimX() && outlineBox.DimY() >= box.DimY()) {
+                    outlineIndex = i;
+                    largestArea = std::abs(outlineArea);
+                }
+            }
         }
 
-        if (useChartBBAsOutline) {
-            LOG_WARN << "Failed to compute outline, falling back to uv bounding box for chart " << chart.id;
+        if (outlineIndex == -1) {
+            LOG_WARN << "Outline not bounding, falling back to UV bounding box for chart " << chart.id;
             outline.clear();
             outline.push_back(Point2d(box.min.X(), box.min.Y()));
             outline.push_back(Point2d(box.max.X(), box.min.Y()));
@@ -237,7 +234,7 @@ namespace Defrag
             outline.push_back(Point2d(box.min.X(), box.max.Y()));
             return outline;
         } else {
-            return outline2Vec[i];
+            return outline2Vec[outlineIndex];
         }
 
     }

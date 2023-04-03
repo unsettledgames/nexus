@@ -31,7 +31,7 @@ class QImage;
 
 namespace Defrag
 {
-    class TextureObject;
+    struct TextureObject;
 
     typedef std::shared_ptr<TextureObject> TextureObjectHandle;
 

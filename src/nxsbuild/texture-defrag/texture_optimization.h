@@ -54,4 +54,5 @@ namespace Defrag
     void TrimTexture(Mesh& m, std::vector<TextureSize>& texszVec, bool unsafeMip);
 }
 
+
 #endif // TEXTURE_OPTIMIZATION_H

@@ -22,8 +22,6 @@
 #include <vcg/complex/complex.h>
 #include <vcg/complex/algorithms/attribute_seam.h>
 
-#include "gl_utils.h" // required for obj importer to use glu::tessellator
-
 #include <wrap/io_trimesh/import.h>
 #include <wrap/io_trimesh/export.h>
 
@@ -55,9 +53,6 @@ namespace Defrag
             LOG_ERR << "Unable to read " << fileName;
             return false;
         }
-
-        std::string dirname = fi.dir().dirName().toStdString();
-        m.name = dirname + "_" + fi.fileName().toStdString();
 
         QString wd = QDir::currentPath();
         QDir::setCurrent(fi.absoluteDir().absolutePath());

@@ -52,4 +52,6 @@ namespace Defrag
     void ClearHoleFillingFaces(Mesh& shell, bool holefill, bool scaffold);
 }
 
+
+
 #endif // SHELL_H

@@ -90,7 +90,6 @@ namespace Defrag
     class MeshEdge : public Edge<MeshUsedTypes, edge::VertexRef, edge::VEAdj, edge::EEAdj, edge::BitFlags> {};
     class Mesh : public tri::TriMesh<std::vector<MeshVertex>, std::vector<MeshFace>>{
     public:
-        std::string name{"mesh"};
 
         ~Mesh()
         {

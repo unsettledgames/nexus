@@ -55,4 +55,5 @@ namespace Defrag
     std::vector<HalfEdgePair> CrossIntersection(const std::vector<HalfEdge>& heVec1, const std::vector<HalfEdge>& heVec2);
 }
 
+
 #endif // INTERSECTION_H

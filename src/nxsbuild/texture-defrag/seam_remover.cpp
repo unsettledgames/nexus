@@ -37,11 +37,9 @@
 
 #include <vcg/complex/algorithms/clean.h>
 
-
 namespace Defrag
 {
     constexpr double PENALTY_MULTIPLIER = 2.0;
-
 
     struct Perf {
         double t_init;
@@ -270,7 +268,7 @@ namespace Defrag
         state->inputUVBorderLength = 0;
         state->currentUVBorderLength = 0;
 
-        BuildSeamMesh(graph->mesh, state->sm);
+        BuildSeamMesh(graph->mesh, state->sm, graph);
         std::vector<SeamHandle> seams = GenerateSeams(state->sm);
 
         // disconnecting seams are (initially) clustered by chart adjacency
@@ -292,9 +290,10 @@ namespace Defrag
         LOG_INFO << "Found " << nself << " non-disconnecting seams";
 
         // sanity check
-        for (auto& entry : state->chartSeamMap) {
-            ensure(entry.second.size() >= (graph->GetChart(entry.first)->adj.size()));
-        }
+        //for (auto& entry : state->chartSeamMap) {
+        //    LOG_INFO << entry.first;
+        //    ensure(entry.second.size() >= (graph->GetChart(entry.first)->adj.size()));
+        //}
 
         for (const auto& ch : graph->charts) {
             state->inputUVBorderLength += ch.second->BorderUV();
@@ -393,15 +392,9 @@ namespace Defrag
                 }
             }
         }
-
         PrintStateInfo(state, graph, params);
-
         LogExecutionStats();
-
-        Mesh shell;
-
         LOG_INFO << "Atlas energy after optimization is " << ARAP::ComputeEnergyFromStoredWedgeTC(graph->mesh, nullptr, nullptr);
-
     }
 
     void Finalize(GraphHandle graph, int *vndup)
@@ -685,6 +678,11 @@ namespace Defrag
                 Mesh::VertexPointer v0b = edge.fb->V0(edge.eb);
                 Mesh::VertexPointer v1b = edge.fb->V1(edge.eb);
 
+                sd.seamVertices.insert(v0a);
+                sd.seamVertices.insert(v1a);
+                sd.seamVertices.insert(v0b);
+                sd.seamVertices.insert(v1b);
+
                 if (v0a->P() != edge.V(0)->P())
                     std::swap(v0a, v1a);
                 if (v0b->P() != edge.V(0)->P())
@@ -708,9 +706,11 @@ namespace Defrag
             }
         }
 
-        // for each vertex merged, store its original vfadj fan
-        for (auto& entry : sd.mrep) {
-            face::VFStarVF(entry.first, sd.vfmap[entry.first].first, sd.vfmap[entry.first].second);
+        for (auto vp : sd.seamVertices) {
+            std::vector<Mesh::FacePointer> faces;
+            std::vector<int> indices;
+            face::VFStarVF(vp, faces, indices);
+            sd.vfTopologyFaceSet.insert(faces.begin(), faces.end());
         }
 
         // update vertex references
@@ -727,8 +727,7 @@ namespace Defrag
             }
         }
 
-        // update topologies. face-face is trivial, for vertex-face we
-        // merge the VF lists
+        // update topologies. face-face is trivial
 
         // face-face
         for (SeamHandle sh : csh->seams) {
@@ -741,19 +740,20 @@ namespace Defrag
             }
         }
 
-        //tri::UpdateTopology<Mesh>::VertexFace(graph->mesh);
+        {
+            for (Mesh::VertexPointer vp : sd.seamVertices) {
+                vp->VFp() = 0;
+                vp->VFi() = 0;
+            }
 
-        // iterate over emap, and concatenate vf adjacencies
-        // ugly... essentially we have a list of vfadj fans stored in vfmap,
-        // and we concatenate the end of a fan with the beginning of the next
-        // note that we only change the data stored in the faces (i.e. the list) and
-        // never touch the data stored on the vertices
-        for (auto& entry : sd.evec) {
-            if (entry.second.size() > 1) {
-                std::vector<Mesh::VertexPointer>& verts = entry.second;
-                for (unsigned i = 0; i < entry.second.size() - 1; ++i) {
-                    sd.vfmap[verts[i]].first.back()->VFp(sd.vfmap[verts[i]].second.back()) = sd.vfmap[verts[i+1]].first.front();
-                    sd.vfmap[verts[i]].first.back()->VFi(sd.vfmap[verts[i]].second.back()) = sd.vfmap[verts[i+1]].second.front();
+            for (Mesh::FacePointer fptr : sd.vfTopologyFaceSet) {
+                for (int i = 0; i < 3; ++i) {
+                    if (sd.seamVertices.find(fptr->V(i)) != sd.seamVertices.end()) {
+                        (*fptr).VFp(i) = (*fptr).V(i)->VFp();
+                        (*fptr).VFi(i) = (*fptr).V(i)->VFi();
+                        (*fptr).V(i)->VFp() = &(*fptr);
+                        (*fptr).V(i)->VFi() = i;
+                    }
                 }
             }
         }
@@ -790,12 +790,21 @@ namespace Defrag
         sd.verticesWithinThreshold = ComputeVerticesWithinOffsetThreshold(mesh, om, sd);
         sd.optimizationArea.clear();
 
+        auto ffadj = Get3DFaceAdjacencyAttribute(mesh);
         for (auto fptr : fpvec) {
+            bool addFace = false;
+            bool edgeManifold = true;
             for (int i = 0; i < 3; ++i) {
-                if (sd.verticesWithinThreshold.find(fptr->V(i)) != sd.verticesWithinThreshold.end()) {
-                    sd.optimizationArea.insert(fptr);
-                    break;
-                }
+                edgeManifold &= IsEdgeManifold3D(mesh, *fptr, i, ffadj);
+                if (sd.verticesWithinThreshold.find(fptr->V(i)) != sd.verticesWithinThreshold.end())
+                    addFace = true;
+            }
+            if (addFace && edgeManifold)
+                sd.optimizationArea.insert(fptr);
+            if (addFace && !edgeManifold) {
+                sd.verticesWithinThreshold.erase(fptr->V(0));
+                sd.verticesWithinThreshold.erase(fptr->V(1));
+                sd.verticesWithinThreshold.erase(fptr->V(2));
             }
         }
 
@@ -860,6 +869,7 @@ namespace Defrag
                 std::vector<Mesh::FacePointer> faces;
                 std::vector<int> indices;
                 face::VFStarVF(node.first, faces, indices);
+
                 for (unsigned i = 0; i < faces.size(); ++i) {
                     if(faces[i]->id != sd.a->id && faces[i]->id != sd.b->id){
                         LOG_ERR << "issue at face " << tri::Index(m, faces[i]);
@@ -883,7 +893,7 @@ namespace Defrag
                     Mesh::VertexPointer v2 = faces[i]->V2(indices[i]);
                     double d2 = dist[node.first] - EdgeLengthUV(*faces[i], e2);
 
-                   if (d2 >= 0 && (dist.find(v2) == dist.end() || dist[v2] < d2)) {
+                    if (d2 >= 0 && (dist.find(v2) == dist.end() || dist[v2] < d2)) {
                         dist[v2] = d2;
                         h.push_back(std::make_pair(v2, d2));
                         std::push_heap(h.begin(), h.end(), cmp);
@@ -1024,7 +1034,7 @@ namespace Defrag
         }
 
         // also ensure the optimization border does not intersect the border of the fixed area
-        // note that this check is not suficient, we should make sure that the optimization AREA
+        // note that this check is not sufficient, we should make sure that the optimization AREA
         // does not intersect with the non-optimized area. This check should be done either with
         // rasterization or triangle intersections
         std::vector<HalfEdge> nopVecBorder;
@@ -1143,6 +1153,7 @@ namespace Defrag
         // split non manifold vertices
         while (tri::Clean<Mesh>::SplitNonManifoldVertex(sd.shell, 0.3))
             ;
+        ensure(tri::Clean<Mesh>::CountNonManifoldEdgeFF(sd.shell) == 0);
 
         CutAlongSeams(sd.shell);
 
@@ -1450,12 +1461,21 @@ namespace Defrag
         // restore vertex-face topology
         // iterate over emap, and split the lists according to the original topology
         // recall that we never touched any vertex topology attribute
-        for (auto& entry : sd.evec) {
-            //ensure(entry.second.size() > 1); not true for self seams at the cone vertex
-            const std::vector<Mesh::VertexPointer>& verts = entry.second;
-            for (unsigned i = 0; i < entry.second.size() - 1; ++i) {
-                sd.vfmap.at(verts[i]).first.back()->VFp(sd.vfmap.at(verts[i]).second.back()) = 0;
-                sd.vfmap.at(verts[i]).first.back()->VFi(sd.vfmap.at(verts[i]).second.back()) = 0;
+        {
+            for (Mesh::VertexPointer vp : sd.seamVertices) {
+                vp->VFp() = 0;
+                vp->VFi() = 0;
+            }
+
+            for (Mesh::FacePointer fptr : sd.vfTopologyFaceSet) {
+                for (int i = 0; i < 3; ++i) {
+                    if (sd.seamVertices.find(fptr->V(i)) != sd.seamVertices.end()) {
+                        (*fptr).VFp(i) = (*fptr).V(i)->VFp();
+                        (*fptr).VFi(i) = (*fptr).V(i)->VFi();
+                        (*fptr).V(i)->VFp() = &(*fptr);
+                        (*fptr).V(i)->VFi() = i;
+                    }
+                }
             }
         }
 

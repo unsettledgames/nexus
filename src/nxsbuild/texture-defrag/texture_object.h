@@ -27,11 +27,11 @@
 #include <cstdint>
 #include <string>
 
-class QImage;
+#include <QImage>
 
 namespace Defrag
 {
-    class TextureObject;
+    struct TextureObject;
 
     typedef std::shared_ptr<TextureObject> TextureObjectHandle;
 
@@ -41,8 +41,7 @@ namespace Defrag
     };
 
     struct TextureImageInfo {
-        std::string path;
-        TextureSize size;
+        QImage texture;
     };
 
     /* wrapper to an array of textures */
@@ -59,6 +58,7 @@ namespace Defrag
 
         /* Add QImage ref to the texture object */
         bool AddImage(std::string path);
+        bool AddImage(const QImage& image);
 
         /* Binds the texture at index i */
         void Bind(int i);
