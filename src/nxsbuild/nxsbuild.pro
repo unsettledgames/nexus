@@ -3,6 +3,7 @@ QT       += core gui svg
 TARGET   = nxsbuild
 CONFIG   += console
 CONFIG   -= app_bundle
+#CONFIG += force_debug_info
 TEMPLATE = app
 
 QMAKE_CXXFLAGS += -std=c++11 -g -fpermissive

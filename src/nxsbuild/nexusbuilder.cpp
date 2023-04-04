@@ -23,6 +23,8 @@ for more details.
 #include <QImage>
 #include <QDir>
 #include <QImageWriter>
+#include <GL/glew.h>
+#include <QOpenGLWidget>
 #include "vertex_cache_optimizer.h"
 
 #include "nexusbuilder.h"
@@ -45,6 +47,9 @@ for more details.
 #include "../texture-defrag/src/seam_remover.h"
 #include "../texture-defrag/src/texture_rendering.h"
 
+#include <QApplication>
+#include <QOffscreenSurface>
+#include <QOpenGLContext>
 #include <iostream>
 
 #define NXS_FORMAT_VERSION  3
@@ -58,8 +63,6 @@ namespace nx
         qint64 m = (s-1) & ~(padding -1);
         return m + padding;
     }
-
-
 
     unsigned int nextPowerOf2 ( unsigned int n )
     {
@@ -224,7 +227,7 @@ namespace nx
         ap.globalDistortionThreshold = 0.025f;
         ap.UVBorderLengthReduction = 0.0;
         ap.offsetFactor = 5;
-        ap.timelimit = 0;
+        ap.timelimit = 10;
 
         // Finally create TextureObject
         Defrag::TextureObjectHandle textureObject = std::make_shared<Defrag::TextureObject>();
@@ -262,7 +265,7 @@ namespace nx
 
         for (int i = 0; i < mesh.FN(); ++i) {
             for (int k = 0; k < 3; ++k) {
-                fi->V(k) = &defragMesh.vert[0];
+                fi->V(k) = &defragMesh.vert[mesh.face[i].cV(k) - &(*mesh.vert.begin())];
                 fi->WT(k).U() = mesh.face[i].cWT(k).U();
                 fi->WT(k).V() = mesh.face[i].cWT(k).V();
                 fi->WT(k).N() = mesh.face[i].cWT(k).N();
@@ -344,7 +347,28 @@ namespace nx
         Defrag::TrimTexture(defragMesh, texszVec, false);
         Defrag::IntegerShift(defragMesh, chartsToPack, texszVec, anchorMap, flipped);
 
-        // Render
+        // Create dummy OpenGL context
+        QOpenGLContext glContext;
+
+        QSurfaceFormat format;
+        format.setMajorVersion(3);
+        format.setMinorVersion(0);
+
+        glContext.setFormat(format);
+        glContext.create();
+
+        QOffscreenSurface surface;
+        surface.setFormat(format);
+        surface.create();
+
+        glContext.makeCurrent(&surface);
+        glContext.supportsThreadedOpenGL();
+
+        // init glew
+        glewExperimental = GL_TRUE;
+        auto ret = glewInit();
+
+        std::cout << "Rendering texture" << std::endl;
         std::vector<std::shared_ptr<QImage>> newTextures = Defrag::RenderTexture(defragMesh, textureObject, texszVec, true,
             Defrag::RenderMode::Linear);
 
@@ -357,7 +381,16 @@ namespace nx
             outputMP = totArea / 1000000.0;
         }
 
-        return QImage();
+        // Apply changes to mesh
+        for (int i = 0; i < defragMesh.FN(); ++i) {
+            for (int k = 0; k < 3; ++k) {
+                mesh.face[i].WT(k).U() = defragMesh.face[i].WT(k).U();
+                mesh.face[i].WT(k).V() = defragMesh.face[i].WT(k).V();
+                mesh.face[i].WT(k).N() = defragMesh.face[i].WT(k).N();
+            }
+        }
+
+        return *newTextures[0];
     }
 
     void NexusBuilder::createCloudLevel(KDTreeCloud *input, StreamCloud *output, int level) {
@@ -489,33 +522,42 @@ namespace nx
                     nodetex = extractNodeTex(mesh, originalTextures, level, error, pixelXedge);
                 else
                 {
+                    cout << "Not level 0" << endl;
                     // Get used textures
                     std::vector<Texture> toDefrag;
-                    for (auto& patch : node_patches)
+                    for (auto& patch : node_patches) {
+                        patch.texture = patches[nodes[patch.node].first_patch].texture;
                         toDefrag.push_back(textures[patch.texture]);
+                    }
 
+                    cout << "Used textures ok" << endl;
                     std::vector<QImage> texImages(toDefrag.size());
                     uint64_t currOffset = toDefrag[0].getBeginOffset();
 
-                    for (uint32_t i=0; i<toDefrag.size()-1; i++)
+                    cout << "Start reading" << endl;
+                    for (uint32_t i=0; i<toDefrag.size(); i++)
                     {
-                        uint32_t dataSize = toDefrag[i].getSize();
+                        uint64_t dataSize;
                         nodeTex.seek(currOffset);
 
                         uint8_t* data;
                         if (i < toDefrag.size()-1)
-                            data = (uint8_t*)nodeTex.read(dataSize).data();
+                            dataSize = toDefrag[i+1].getBeginOffset() - currOffset;
                         else
-                            data = (uint8_t*)nodeTex.read(nodeTex.size() - currOffset).data();
+                            dataSize = nodeTex.size() - currOffset;
 
-                        texImages[i] = QImage();
+                        auto bytes = nodeTex.read(dataSize);
+                        data = (uint8_t*)bytes.data();
                         texImages[i].loadFromData(data, dataSize);
+
                         // Convert format if necessary
                         if (texImages[i].format() != QImage::Format_RGB888)
                             texImages[i].convertToFormat(QImage::Format_RGB888);
 
-                        currOffset += toDefrag[i].getSize();
+                        currOffset += dataSize;
                     }
+
+                    cout << "Textures read correctly" << endl;
 
                     nodetex = extractNodeTex(mesh, texImages, level, error, pixelXedge);
                 }
@@ -555,8 +597,8 @@ namespace nx
                 rewriter.setQuality(tex_quality);
                 rewriter.write(nodetex);
 
-                tmp.textures.push_back(texname.toStdString());
-                tmp.savePlyTex(QString::number(counter) + ".ply", texname);
+                mesh.textures.push_back(texname.toStdString());
+                mesh.savePlyTex(QString::number(counter) + ".ply", texname);
                 counter++;
     #endif
             }
@@ -578,17 +620,15 @@ namespace nx
         delete []buffer;
 
 
-
         nx::Node node;
         if(!hasTextures())
             node = mesh1.getNode(); //get node data before simplification
         else
-            node = tmp.getNode();
+            node = mesh.getNode();
 
 
         int nface;
         {
-
             if(!hasTextures()) {
                 mesh1.lockVertices();
                 { //needed only if Mesh::QUADRICS
@@ -629,7 +669,6 @@ namespace nx
             node.offset = chunk;          //temporarily remember which chunk belongs to which node
             node.error = error;
 
-
             node.first_patch = patch_offset;
 
             nodes.push_back(node);
@@ -638,11 +677,6 @@ namespace nx
 
 
         //Simplify and stream the meshes
-
-
-
-
-
         Triangle *triangles = new Triangle[nface];
         //streaming the output
         if(!hasTextures()) {

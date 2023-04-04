@@ -165,11 +165,14 @@ namespace Defrag
 
         GLuint vao;
         glGenVertexArrays(1, &vao);
+        CheckGLError();
+
         glBindVertexArray(vao);
+        CheckGLError();
 
         GLint program = CompileShaders(vs_text, fs_text);
+        CheckGLError();
         glUseProgram(program);
-
         CheckGLError();
 
         // Allocate vertex data

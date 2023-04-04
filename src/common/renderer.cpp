@@ -336,7 +336,6 @@ void Renderer::renderSelected(Nexus *nexus) {
                 start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
         }
         else {
-            std::cout << "Version 3" << std::endl;
             if(draw_colors)
                 glColorPointer(4, GL_UNSIGNED_BYTE, 0, (void *)start);
             if(sig.vertex.hasColors())

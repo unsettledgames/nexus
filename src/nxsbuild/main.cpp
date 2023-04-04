@@ -17,9 +17,12 @@ for more details.
 */
 #include <iostream>
 #include <iomanip>
+#include <GL/glew.h>
+#include <QOpenGLWidget>
 
 #include <QtGui>
 #include <QVariant>
+#include <QApplication>
 
 #include <wrap/system/qgetopt.h>
 
@@ -36,9 +39,14 @@ using namespace nx;
 int main(int argc, char *argv[]) {
 
 	// we create a QCoreApplication just so that QT loads image IO plugins (for jpg and tiff loading)
-	QCoreApplication myUselessApp(argc, argv);
+    QApplication myUselessApp(argc, argv);
+    Q_UNUSED(myUselessApp);
+
 	setlocale(LC_ALL, "C");
-	QLocale::setDefault(QLocale::C);
+    QLocale::setDefault(QLocale::C);
+
+    std::cout << "Init OpenGL" << std::endl;
+
 
 	int node_size = 1<<15;
 	float texel_weight =0.05; //relative weight of texels.

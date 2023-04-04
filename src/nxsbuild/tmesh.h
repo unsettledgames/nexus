@@ -55,6 +55,7 @@ namespace nx
     class TVertex  : public vcg::Vertex<
             TUsedTypes,
             vcg::vertex::VFAdj,
+            vcg::vertex::VEAdj,
             vcg::vertex::Coord3f,
             vcg::vertex::Normal3f,
             vcg::vertex::TexCoord2f,
