@@ -130,6 +130,8 @@ namespace nx
                 vertex.c[1] = v.C()[1];
                 vertex.c[2] = v.C()[2];
                 vertex.c[3] = v.C()[3];
+                vertex.t[0] = v.T().U();
+                vertex.t[1] = v.T().V();
             }
             triangle.node = node;
             triangle.tex = t.tex;
@@ -364,7 +366,7 @@ namespace nx
         return size;
     }
 
-    void TMesh::serialize(uchar *buffer, nx::Signature &sig, std::vector<nx::Patch> &patches) {
+    void TMesh::createPatch(nx::Signature sig, std::vector<nx::Patch>& patches) {
         assert(vn == (int)vert.size());
         assert(fn == (int)face.size());
 
@@ -412,7 +414,9 @@ namespace nx
         }
         patch.texture = 0xffffffff;
         patches.push_back(patch);
+    }
 
+    void TMesh::serialize(uchar *buffer, nx::Signature &sig, std::vector<nx::Patch> patches) {
         vcg::Point3f *c = (vcg::Point3f *)buffer;
         for(int i = 0; i < vn; i++)
             c[i] = vert[i].P();

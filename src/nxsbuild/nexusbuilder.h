@@ -77,7 +77,7 @@ class NexusBuilder {
 public:
 	enum Components { FACES = 1, NORMALS = 2, COLORS = 4, TEXTURES = 8 };
 	NexusBuilder(quint32 components);
-	NexusBuilder(nx::Signature &sig);
+    NexusBuilder(nx::Signature &sig);
 
 	bool hasNormals() { return header.signature.vertex.hasNormals(); }
 	bool hasColors() { return header.signature.vertex.hasColors(); }
@@ -113,10 +113,11 @@ public:
 	QMutex m_builder;   //locks builders data (patches, etc.)
 	QMutex m_chunks;    //locks builder chunks (the cache)
 	QMutex m_atlas;     //locks atlas (the cache)
-	QMutex m_texsimply;     //locks the temporary data simplification structure for texture. (UGH)
+    QMutex m_texsimply;     //locks the temporary data simplification structure for texture. (UGH)
+    QMutex m_textures;  //locks  texture temporary file
+    // TODO mutex for tex rendering
 
 
-	QMutex m_textures;  //locks  texture temporary file
 
 
 	QFile file;
@@ -149,7 +150,7 @@ public:
 
 	void processBlock(KDTreeSoup *input, StreamSoup *output, uint block, int level);
 
-    QImage extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, int level, float &error, float &pixelXedge);
+     std::vector<QImage> extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, int level, float &error, float &pixelXedge);
 	void invertNodes(); //
 	void saturateNode(quint32 n);
 	void optimizeNode(quint32 node, uchar *chunk);

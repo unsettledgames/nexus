@@ -1274,6 +1274,9 @@ function scramble(n, coords, normals, colors) {
 }
 
 function readyNode(node) {
+	console.log("Requested node");
+	console.log(node);
+	
 	var m = node.mesh;
 	var n = node.id;
 	var nv = m.nvertices[n];

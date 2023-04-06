@@ -122,6 +122,7 @@ namespace nx
         void getTriangles(Triangle *triangles, quint32 node);
         void getVertices(Splat *vertices, quint32 node);
 
+        void createPatch(nx::Signature sig, std::vector<nx::Patch>& patches);
         void splitSeams(nx::Signature &sig);
 
         float simplify(quint32 target_faces, Simplification method);
@@ -135,7 +136,7 @@ namespace nx
         nx::Node getNode();
         quint32 serializedSize(nx::Signature &sig);
         //appends nodes found in the TMesh
-        void serialize(uchar *buffer, nx::Signature &sig, std::vector<nx::Patch> &patches);
+        void serialize(uchar *buffer, nx::Signature &sig, std::vector<nx::Patch> patches);
 
         vcg::Sphere3f boundingSphere();
         nx::Cone3s normalsCone();

@@ -216,7 +216,7 @@ namespace nx
 
     };
 
-    QImage NexusBuilder::extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, int level, float &error, float &pixelXedge) {
+    std::vector<QImage> NexusBuilder::extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, int level, float &error, float &pixelXedge) {
         cout << "Extracting textures" << endl;
         // Set default parameters for defragmenter
         Defrag::AlgoParameters ap;
@@ -231,24 +231,13 @@ namespace nx
 
         // Finally create TextureObject
         Defrag::TextureObjectHandle textureObject = std::make_shared<Defrag::TextureObject>();
+        cout << "N textures: " << toDefrag.size() << endl;
+
         for (auto& img : toDefrag)
             textureObject->AddImage(img);
         cout << "loaded textures" << endl;
 
-        /* PLAN
-         *  - Edit the mesh, return the new textures
-         */
-
-        // Clean original mesh before converting it to a Defrag::Mesh
-        tri::Clean<nx::TMesh>::RemoveZeroAreaFace(mesh);
-        tri::Clean<nx::TMesh>::RemoveDuplicateVertex(mesh);
-        tri::Allocator<nx::TMesh>::CompactEveryVector(mesh);
-
-        tri::UpdateTopology<nx::TMesh>::FaceFace(mesh);
-        tri::UpdateNormal<nx::TMesh>::PerFaceNormalized(mesh);
-        tri::UpdateNormal<nx::TMesh>::PerVertexNormalized(mesh);
-
-        cout << "Cleaned mesh" << endl;
+        cout << "Copy mesh" << endl;
 
         // Create Defrag::Mesh
         Defrag::Mesh defragMesh;
@@ -274,16 +263,21 @@ namespace nx
         }
 
         for (auto& f : defragMesh.face)
-            f.SetMesh();
+            f.SetMesh();        
 
-        cout << "Copy mesh" << endl;
+        // Clean mesh
+        tri::UpdateTopology<Defrag::Mesh>::FaceFace(defragMesh);
+        tri::UpdateNormal<Defrag::Mesh>::PerFaceNormalized(defragMesh);
+        tri::UpdateNormal<Defrag::Mesh>::PerVertexNormalized(defragMesh);
+
+        cout << "Cleaned mesh" << endl;
 
         Defrag::ScaleTextureCoordinatesToImage(defragMesh, textureObject);
 
         // Prepare mesh
         int vndupIn;
-        PrepareMesh(defragMesh, &vndupIn);
-        ComputeWedgeTexCoordStorageAttribute(defragMesh);
+        Defrag::PrepareMesh(defragMesh, &vndupIn);
+        Defrag::ComputeWedgeTexCoordStorageAttribute(defragMesh);
 
         // After this function is called, graph holds a reference to the textureObject
         Defrag::GraphHandle graph = Defrag::ComputeGraph(defragMesh, textureObject);
@@ -292,7 +286,7 @@ namespace nx
             flipped[c.first] = c.second->UVFlipped();
 
         // ensure all charts are oriented coherently, and then store the wtc attribute
-        ReorientCharts(graph);
+        Defrag::ReorientCharts(graph);
 
         std::map<Defrag::ChartHandle, int> anchorMap;
         Defrag::AlgoStateHandle state = InitializeState(graph, ap);
@@ -306,7 +300,8 @@ namespace nx
 
         if (colorize)
             tri::UpdateColor<Defrag::Mesh>::PerFaceConstant(m, vcg::Color4b(91, 130, 200, 255));
-       */
+        */
+
         // Rotate charts
         for (auto entry : graph->charts) {
             Defrag::ChartHandle chart = entry.second;
@@ -340,13 +335,15 @@ namespace nx
 
         // Some charts weren't packed
         if (npacked < (int) chartsToPack.size()) {
-            // Handle
+            cout << "Couldn't pack " << chartsToPack.size() - npacked << " charts" << endl;
         }
 
+        cout << "Trim & shift" << endl;
         // Trim & shift
         Defrag::TrimTexture(defragMesh, texszVec, false);
         Defrag::IntegerShift(defragMesh, chartsToPack, texszVec, anchorMap, flipped);
 
+        cout << "Init OpenGL" << endl;
         // Create dummy OpenGL context
         QOpenGLContext glContext;
 
@@ -366,31 +363,45 @@ namespace nx
 
         // init glew
         glewExperimental = GL_TRUE;
-        auto ret = glewInit();
+        auto glewInited = glewInit();
 
         std::cout << "Rendering texture" << std::endl;
         std::vector<std::shared_ptr<QImage>> newTextures = Defrag::RenderTexture(defragMesh, textureObject, texszVec, true,
             Defrag::RenderMode::Linear);
 
-        double outputMP;
-        {
-            int64_t totArea = 0;
-            for (unsigned i = 0; i < newTextures.size(); ++i) {
-                totArea += newTextures[i]->width() * newTextures[i]->height();
-            }
-            outputMP = totArea / 1000000.0;
+        cout << "Rendered" << endl;
+
+        mesh.face.resize(defragMesh.FN());
+        mesh.fn = defragMesh.FN();
+        mesh.vert.resize(defragMesh.VN());
+        mesh.vn = defragMesh.VN();
+
+        cout << "Resized buffers" << endl;
+
+        for (int i = 0; i < defragMesh.VN(); ++i) {
+            mesh.vert[i].P().X() = defragMesh.vert[i].P().X();
+            mesh.vert[i].P().Y() = defragMesh.vert[i].P().Y();
+            mesh.vert[i].P().Z() = defragMesh.vert[i].P().Z();
         }
 
-        // Apply changes to mesh
+        cout << "Copied vertices" << endl;
+
         for (int i = 0; i < defragMesh.FN(); ++i) {
             for (int k = 0; k < 3; ++k) {
-                mesh.face[i].WT(k).U() = defragMesh.face[i].WT(k).U();
-                mesh.face[i].WT(k).V() = defragMesh.face[i].WT(k).V();
-                mesh.face[i].WT(k).N() = defragMesh.face[i].WT(k).N();
+                mesh.face[i].V(k) = &mesh.vert[defragMesh.face[i].cV(k) - &(*defragMesh.vert.begin())];
+                mesh.face[i].P(k) = defragMesh.face[i].P(k);
+
+                mesh.face[i].WT(k).U() = defragMesh.face[i].cWT(k).U();
+                mesh.face[i].WT(k).V() = defragMesh.face[i].cWT(k).V();
+                mesh.face[i].WT(k).N() = defragMesh.face[i].cWT(k).N();
             }
         }
 
-        return *newTextures[0];
+        cout << "Copied faces" << endl;
+        std::vector<QImage> ret;
+        for (uint32_t i=0; i<newTextures.size(); i++)
+            ret.push_back(*newTextures[i]);
+        return ret;
     }
 
     void NexusBuilder::createCloudLevel(KDTreeCloud *input, StreamCloud *output, int level) {
@@ -472,13 +483,11 @@ namespace nx
 
     void NexusBuilder::processBlock(KDTreeSoup *input, StreamSoup *output, uint block, int level) {
         TMesh mesh;
-        TMesh tmp; //this is needed saving a mesh with vertices on seams duplicated., and for node tex coordinates to be rearranged
-
         Mesh mesh1;
+
         quint32 mesh_size;
-
-
         int ntriangles = 0;
+
         {
             QMutexLocker locker(&m_input);
             Soup soup = input->get(block); //soup is memory allocated by input, lock is needed.
@@ -500,74 +509,87 @@ namespace nx
             mesh_size = mesh1.serializedSize(header.signature);
 
         } else {
+            mesh.splitSeams(header.signature);
             mesh_size = mesh.serializedSize(header.signature);
+
+            static int n = 0;
+            QString texname = "Loaded" + QString::number(n) +  ".jpg";
+
+            QImageWriter rewriter(texname, "jpg");
+            rewriter.setQuality(100);
+            if (level == 0)
+                rewriter.write(originalTextures[0]);
+            mesh.savePlyTex("Loaded" + QString::number(n) + ".ply", texname);
+            n++;
         }
         mesh_size = pad(mesh_size);
-        uchar *buffer = new uchar[mesh_size];
 
+        uchar *buffer = new uchar[mesh_size];
         std::vector<Patch> node_patches;
 
         float error;
         float pixelXedge;
         if(!hasTextures()) {
+            cout << "Untextured" << endl;
             mesh1.serialize(buffer, header.signature, node_patches);
         } else {
-
             if(useNodeTex) {
-                mesh.serialize(buffer, header.signature, node_patches);
+                mesh.createPatch(header.signature, node_patches);
 
                 // Load texture data
-                QImage nodetex;
-                if (level == 0)
-                    nodetex = extractNodeTex(mesh, originalTextures, level, error, pixelXedge);
+                std::vector<QImage> packedTextures;
+                if (level == 0) {
+                    packedTextures = extractNodeTex(mesh, originalTextures, level, error, pixelXedge);
+                }
                 else
                 {
-                    cout << "Not level 0" << endl;
+                    cout << "Textured" << endl;
                     // Get used textures
-                    std::vector<Texture> toDefrag;
+                    std::vector<int> toDefrag;
                     for (auto& patch : node_patches) {
                         patch.texture = patches[nodes[patch.node].first_patch].texture;
-                        toDefrag.push_back(textures[patch.texture]);
+                        toDefrag.push_back(patch.texture);
                     }
 
-                    cout << "Used textures ok" << endl;
                     std::vector<QImage> texImages(toDefrag.size());
-                    uint64_t currOffset = toDefrag[0].getBeginOffset();
 
-                    cout << "Start reading" << endl;
-                    for (uint32_t i=0; i<toDefrag.size(); i++)
                     {
-                        uint64_t dataSize;
-                        nodeTex.seek(currOffset);
+                        QMutexLocker locker(&m_textures);
 
-                        uint8_t* data;
-                        if (i < toDefrag.size()-1)
-                            dataSize = toDefrag[i+1].getBeginOffset() - currOffset;
-                        else
-                            dataSize = nodeTex.size() - currOffset;
+                        for (uint32_t i=0; i<toDefrag.size(); i++)
+                        {
+                            Texture tex = textures[toDefrag[i]];
+                            uint64_t offset = tex.getBeginOffset();
+                            uint64_t endOffset = (i == textures.size() - 1) ? nodeTex.size() : tex.getEndOffset();
 
-                        auto bytes = nodeTex.read(dataSize);
-                        data = (uint8_t*)bytes.data();
-                        texImages[i].loadFromData(data, dataSize);
+                            uint64_t dataSize = endOffset - offset;
+                            nodeTex.seek(offset);
 
-                        // Convert format if necessary
-                        if (texImages[i].format() != QImage::Format_RGB888)
-                            texImages[i].convertToFormat(QImage::Format_RGB888);
+                            uint8_t* data;
+                            auto bytes = nodeTex.read(dataSize);
+                            data = (uint8_t*)bytes.data();
+                            texImages[i].loadFromData(data, dataSize);
 
-                        currOffset += dataSize;
+                            // Convert format if necessary
+                            if (texImages[i].format() != QImage::Format_RGB888)
+                                texImages[i].convertToFormat(QImage::Format_RGB888);
+                        }
+
+                        nodeTex.seek(nodeTex.size());
                     }
 
-                    cout << "Textures read correctly" << endl;
-
-                    nodetex = extractNodeTex(mesh, texImages, level, error, pixelXedge);
+                    packedTextures = extractNodeTex(mesh, texImages, level, error, pixelXedge);
                 }
+
+                mesh.splitSeams(header.signature);
+                mesh.serialize(buffer, header.signature, node_patches);
 
                 Texture t;
                 {
                     QMutexLocker locker(&m_textures);
                     t.offset = nodeTex.size()/NEXUS_PADDING;
 
-                    output_pixels += nodetex.width()*nodetex.height();
+                    output_pixels += packedTexture.width()*packedTexture.height();
 
                     QImageWriter writer(&nodeTex, "jpg");
                     writer.setQuality(tex_quality);
@@ -575,7 +597,7 @@ namespace nx
                     writer.setOptimizedWrite(true);
                     writer.setProgressiveScanWrite(true);
     #endif
-                    writer.write(nodetex);
+                    writer.write(packedTexture);
 
                     quint64 size = pad(nodeTex.size());
                     nodeTex.resize(size);
@@ -588,14 +610,15 @@ namespace nx
                         patch.texture = textures.size()-1; //last texture inserted
                 }
 
-                //#define DEBUG_TEXTURES
+                #define DEBUG_TEXTURES
     #ifdef DEBUG_TEXTURES
+                cout << "Saving test meshes and textures" << endl;
                 static int counter = 0;
 
                 QString texname = QString::number(counter) + ".jpg";
                 QImageWriter rewriter(texname, "jpg");
                 rewriter.setQuality(tex_quality);
-                rewriter.write(nodetex);
+                rewriter.write(packedTexture);
 
                 mesh.textures.push_back(texname.toStdString());
                 mesh.savePlyTex(QString::number(counter) + ".ply", texname);
@@ -619,13 +642,11 @@ namespace nx
         }
         delete []buffer;
 
-
         nx::Node node;
         if(!hasTextures())
             node = mesh1.getNode(); //get node data before simplification
         else
             node = mesh.getNode();
-
 
         int nface;
         {
@@ -654,7 +675,6 @@ namespace nx
                 nface = mesh.fn;
             }
         }
-
 
         quint32 current_node;
         {
@@ -691,6 +711,8 @@ namespace nx
                 Triangle &t = triangles[i];
                 if(!t.isDegenerate())
                     output->pushTriangle(triangles[i]);
+                else
+                    cout << "Degenerate" << endl;
             }
         }
         delete []triangles;
