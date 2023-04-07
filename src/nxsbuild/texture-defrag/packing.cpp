@@ -72,7 +72,7 @@ namespace Defrag
         packingParams.doubleHorizon = false;
         packingParams.innerHorizon = true;
         //packingParams.permutations = false;
-        packingParams.permutations = (charts.size() < 50);
+        packingParams.permutations = false;//(charts.size() < 25);
         packingParams.rotationNum = 4;
         packingParams.gutterWidth = 4;
         packingParams.minmax = false; // not used
@@ -80,81 +80,74 @@ namespace Defrag
         int totPacked = 0;
 
         std::vector<int> containerIndices(outlines.size(), -1); // -1 means not packed to any container
-
         std::vector<vcg::Similarity2f> packingTransforms(outlines.size(), vcg::Similarity2f{});
 
         unsigned nc = 0; // current container index
-        while (totPacked < (int) charts.size()) {
-            if (nc >= containerVec.size())
-                containerVec.push_back(vcg::Point2i(packingSize, packingSize));
+        if (nc >= containerVec.size())
+            containerVec.push_back(vcg::Point2i(packingSize, packingSize));
 
-            std::vector<unsigned> outlineIndex_iter;
-            std::vector<Outline2f> outlines_iter;
-            for (unsigned i = 0; i < containerIndices.size(); ++i) {
-                if (containerIndices[i] == -1) {
-                    outlineIndex_iter.push_back(i);
-                    outlines_iter.push_back(outlines[i]);
-                }
+        std::vector<unsigned> outlineIndex_iter;
+        std::vector<Outline2f> outlines_iter;
+        for (unsigned i = 0; i < containerIndices.size(); ++i) {
+            if (containerIndices[i] == -1) {
+                outlineIndex_iter.push_back(i);
+                outlines_iter.push_back(outlines[i]);
             }
+        }
 
-            const int MAX_SIZE = 20000;
-            std::vector<vcg::Similarity2f> transforms;
-            std::vector<int> polyToContainer;
-            int n = 0;
-            do {
-                transforms.clear();
-                polyToContainer.clear();
-                LOG_INFO << "Packing into grid of size " << containerVec[nc].X() << " " << containerVec[nc].Y();
-                n = RasterizationBasedPacker::PackBestEffortAtScale(outlines_iter, {containerVec[nc]}, transforms, polyToContainer, packingParams, packingScale);
-                if (n == 0) {
-                    containerVec[nc].X() *= 1.1;
-                    containerVec[nc].Y() *= 1.1;
-                }
-            } while (n == 0 && containerVec[nc].X() <= MAX_SIZE && containerVec[nc].Y() <= MAX_SIZE);
+        const int MAX_SIZE = 20000;
+        std::vector<vcg::Similarity2f> transforms;
+        std::vector<int> polyToContainer;
+        std::vector<int> containerSizes(containerVec.size());
+        for (uint32_t i=0; i<containerSizes.size(); i++)
+            containerSizes[i] = packingSize;
 
-            totPacked += n;
+        int n = 0;
+        do {
+            transforms.clear();
+            polyToContainer.clear();
+            LOG_INFO << "Packing into grid of size " << containerVec[nc].X() << " " << containerVec[nc].Y();
+            n = RasterizationBasedPacker::Pack(outlines_iter, {containerVec[0]}, transforms, polyToContainer, packingParams);
+            std::cout << "Packing ret: " << n << std::endl;
 
-            if (n == 0) // no charts were packed, stop
-                break;
-            else {
-                double textureScale = 1.0 / packingScale;
-                texszVec.push_back({(int) (containerVec[nc].X() * textureScale), (int) (containerVec[nc].Y() * textureScale)});
-                for (unsigned i = 0; i < outlines_iter.size(); ++i) {
-                    if (polyToContainer[i] != -1) {
-                        ensure(polyToContainer[i] == 0); // We only use a single container
-                        int outlineInd = outlineIndex_iter[i];
-                        ensure(containerIndices[outlineInd] == -1);
-                        containerIndices[outlineInd] = nc;
-                        packingTransforms[outlineInd] = transforms[i];
-                    }
-                }
+            if (n == 0) {
+                containerVec[nc].X() *= 1.1;
+                containerVec[nc].Y() *= 1.1;
             }
-            nc++;
+        } while (n == 0 && containerVec[nc].X() <= MAX_SIZE && containerVec[nc].Y() <= MAX_SIZE);
+
+        totPacked = charts.size();
+
+        if (n != 0) {
+            double textureScale = 1.0 / packingScale;
+            texszVec.push_back({(int) (containerVec[0].X() * textureScale), (int) (containerVec[0].Y() * textureScale)});
+            for (unsigned i = 0; i < outlines_iter.size(); ++i) {
+                if (polyToContainer[i] != -1) {
+                    ensure(polyToContainer[i] == 0); // We only use a single container
+                    int outlineInd = outlineIndex_iter[i];
+                    ensure(containerIndices[outlineInd] == -1);
+                    containerIndices[outlineInd] = nc;
+                    packingTransforms[outlineInd] = transforms[i];
+                }
+                else
+                    std::cout << i << " was not packed" << std::endl;
+            }
         }
 
         for (unsigned i = 0; i < charts.size(); ++i) {
             for (auto fptr : charts[i]->fpVec) {
-                int ic = containerIndices[i];
-                if (ic < 0) {
-                    for (int j = 0; j < fptr->VN(); ++j) {
-                        fptr->V(j)->T().P() = Point2d::Zero();
-                        fptr->V(j)->T().N() = 0;
-                        fptr->WT(j).P() = Point2d::Zero();
-                        fptr->WT(j).N() = 0;
-                    }
-                }
-                else {
-                    Point2i gridSize = containerVec[ic];
-                    for (int j = 0; j < fptr->VN(); ++j) {
-                        Point2d uv = fptr->WT(j).P();
-                        Point2f p = packingTransforms[i] * (Point2f(uv[0], uv[1]));
-                        p.X() /= (double) gridSize.X();
-                        p.Y() /= (double) gridSize.Y();
-                        fptr->V(j)->T().P() = Point2d(p.X(), p.Y());
-                        fptr->V(j)->T().N() = ic;
-                        fptr->WT(j).P() = fptr->V(j)->T().P();
-                        fptr->WT(j).N() = fptr->V(j)->T().N();
-                    }
+                Point2i gridSize = containerVec[0];
+                for (int j = 0; j < fptr->VN(); ++j) {
+                    Point2d uv = fptr->WT(j).P();
+                    Point2f p = packingTransforms[i] * (Point2f(uv[0], uv[1]));
+
+                    p.X() /= (double) gridSize.X();
+                    p.Y() /= (double) gridSize.Y();
+
+                    fptr->V(j)->T().P() = Point2d(p.X(), p.Y());
+                    fptr->V(j)->T().N() = 0;
+                    fptr->WT(j).P() = fptr->V(j)->T().P();
+                    fptr->WT(j).N() = 0;
                 }
             }
         }

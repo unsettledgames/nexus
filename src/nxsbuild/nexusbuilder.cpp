@@ -216,7 +216,8 @@ namespace nx
 
     };
 
-    std::vector<QImage> NexusBuilder::extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, int level, float &error, float &pixelXedge) {
+    QImage NexusBuilder::extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, std::unordered_map<int, int>& faceToPatchTexture,
+                                        int level, float &error, float &pixelXedge) {
         cout << "Extracting textures" << endl;
         // Set default parameters for defragmenter
         Defrag::AlgoParameters ap;
@@ -229,13 +230,10 @@ namespace nx
         ap.offsetFactor = 5;
         ap.timelimit = 10;
 
-        // Finally create TextureObject
+        // Create TextureObject
         Defrag::TextureObjectHandle textureObject = std::make_shared<Defrag::TextureObject>();
-        cout << "N textures: " << toDefrag.size() << endl;
-
         for (auto& img : toDefrag)
             textureObject->AddImage(img);
-        cout << "loaded textures" << endl;
 
         cout << "Copy mesh" << endl;
 
@@ -257,13 +255,15 @@ namespace nx
                 fi->V(k) = &defragMesh.vert[mesh.face[i].cV(k) - &(*mesh.vert.begin())];
                 fi->WT(k).U() = mesh.face[i].cWT(k).U();
                 fi->WT(k).V() = mesh.face[i].cWT(k).V();
-                fi->WT(k).N() = mesh.face[i].cWT(k).N();
+
+                if (level != 0)
+                    fi->WT(k).N() = faceToPatchTexture[patches[nodes[mesh.face[i].node].first_patch].texture];
             }
             ++fi;
         }
 
         for (auto& f : defragMesh.face)
-            f.SetMesh();        
+            f.SetMesh();
 
         // Clean mesh
         tri::UpdateTopology<Defrag::Mesh>::FaceFace(defragMesh);
@@ -397,11 +397,9 @@ namespace nx
             }
         }
 
-        cout << "Copied faces" << endl;
-        std::vector<QImage> ret;
-        for (uint32_t i=0; i<newTextures.size(); i++)
-            ret.push_back(*newTextures[i]);
-        return ret;
+        std::cout << "Output textures " << newTextures.size() << std::endl;
+
+        return *newTextures[0];
     }
 
     void NexusBuilder::createCloudLevel(KDTreeCloud *input, StreamCloud *output, int level) {
@@ -512,6 +510,8 @@ namespace nx
             mesh.splitSeams(header.signature);
             mesh_size = mesh.serializedSize(header.signature);
 
+
+            /*
             static int n = 0;
             QString texname = "Loaded" + QString::number(n) +  ".jpg";
 
@@ -521,6 +521,7 @@ namespace nx
                 rewriter.write(originalTextures[0]);
             mesh.savePlyTex("Loaded" + QString::number(n) + ".ply", texname);
             n++;
+            */
         }
         mesh_size = pad(mesh_size);
 
@@ -534,25 +535,26 @@ namespace nx
             mesh1.serialize(buffer, header.signature, node_patches);
         } else {
             if(useNodeTex) {
+                std::unordered_map<int, int> faceToPatchTexture;
                 mesh.createPatch(header.signature, node_patches);
 
                 // Load texture data
-                std::vector<QImage> packedTextures;
+                QImage packedTexture;
                 if (level == 0) {
-                    packedTextures = extractNodeTex(mesh, originalTextures, level, error, pixelXedge);
+                    packedTexture = extractNodeTex(mesh, originalTextures, faceToPatchTexture, level, error, pixelXedge);
                 }
                 else
                 {
-                    cout << "Textured" << endl;
                     // Get used textures
                     std::vector<int> toDefrag;
                     for (auto& patch : node_patches) {
                         patch.texture = patches[nodes[patch.node].first_patch].texture;
+
+                        faceToPatchTexture[patch.texture] = toDefrag.size();
                         toDefrag.push_back(patch.texture);
                     }
 
                     std::vector<QImage> texImages(toDefrag.size());
-
                     {
                         QMutexLocker locker(&m_textures);
 
@@ -560,9 +562,10 @@ namespace nx
                         {
                             Texture tex = textures[toDefrag[i]];
                             uint64_t offset = tex.getBeginOffset();
-                            uint64_t endOffset = (i == textures.size() - 1) ? nodeTex.size() : tex.getEndOffset();
-
+                            uint64_t endOffset = (i == toDefrag.size() - 1) ? nodeTex.size() : tex.getEndOffset();
                             uint64_t dataSize = endOffset - offset;
+
+                            std::cout << "Start: " << offset << " end: " << endOffset << " size: " << dataSize << std::endl;
                             nodeTex.seek(offset);
 
                             uint8_t* data;
@@ -578,7 +581,7 @@ namespace nx
                         nodeTex.seek(nodeTex.size());
                     }
 
-                    packedTextures = extractNodeTex(mesh, texImages, level, error, pixelXedge);
+                    packedTexture = extractNodeTex(mesh, texImages, faceToPatchTexture, level, error, pixelXedge);
                 }
 
                 mesh.splitSeams(header.signature);

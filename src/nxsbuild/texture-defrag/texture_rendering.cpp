@@ -274,7 +274,7 @@ namespace Defrag
 
             // Load texture image
             glActiveTexture(GL_TEXTURE0);
-            LOG_DEBUG << "Binding texture unit " << currTexIndex;
+            std::cout << "Binding texture unit " << currTexIndex << std::endl;
             textureObject->Bind(currTexIndex);
 
             GLint loc_img0 = glGetUniformLocation(program, "img0");

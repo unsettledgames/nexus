@@ -19,6 +19,7 @@ for more details.
 #define NX_NEXUSBUILDER_H
 
 #include <vector>
+#include <unordered_map>
 
 #include <QString>
 #include <QFile>
@@ -113,8 +114,8 @@ public:
 	QMutex m_builder;   //locks builders data (patches, etc.)
 	QMutex m_chunks;    //locks builder chunks (the cache)
 	QMutex m_atlas;     //locks atlas (the cache)
-    QMutex m_texsimply;     //locks the temporary data simplification structure for texture. (UGH)
-    QMutex m_textures;  //locks  texture temporary file
+     QMutex m_texsimply;     //locks the temporary data simplification structure for texture. (UGH)
+     QMutex m_textures;  //locks  texture temporary file
     // TODO mutex for tex rendering
 
 
@@ -150,7 +151,7 @@ public:
 
 	void processBlock(KDTreeSoup *input, StreamSoup *output, uint block, int level);
 
-     std::vector<QImage> extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, int level, float &error, float &pixelXedge);
+      QImage extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, std::unordered_map<int, int>& faceToPatchTexture, int level, float &error, float &pixelXedge);
 	void invertNodes(); //
 	void saturateNode(quint32 n);
 	void optimizeNode(quint32 node, uchar *chunk);
