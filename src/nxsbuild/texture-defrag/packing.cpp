@@ -38,7 +38,6 @@ namespace Defrag
     int Pack(const std::vector<ChartHandle>& charts, TextureObjectHandle textureObject, std::vector<TextureSize>& texszVec)
     {
         // Pack the atlas
-
         texszVec.clear();
 
         std::vector<Outline2f> outlines;
@@ -51,7 +50,7 @@ namespace Defrag
 
         int packingSize = 4096;
         std::vector<std::pair<double,double>> trs = textureObject->ComputeRelativeSizes();
-
+        // ContainerVec should be 8192x8192 if the original texture is 8192x8192
         std::vector<Point2i> containerVec;
         for (auto rs : trs) {
             vcg::Point2i container(packingSize * rs.first, packingSize * rs.second);
@@ -61,10 +60,13 @@ namespace Defrag
         // compute the scale factor for the packing
         int packingArea = 0;
         int textureArea = 0;
+
         for (unsigned i = 0; i < containerVec.size(); ++i) {
             packingArea += containerVec[i].X() * containerVec[i].Y();
-            textureArea += textureObject->TextureWidth(i) * textureObject->TextureHeight(i);
         }
+        for (uint32_t i=0; i<charts.size(); i++)
+            textureArea += charts[i]->UVBox().Area();
+
         double packingScale = std::sqrt(packingArea / (double) textureArea);
 
         RasterizationBasedPacker::Parameters packingParams;
@@ -98,9 +100,6 @@ namespace Defrag
         const int MAX_SIZE = 20000;
         std::vector<vcg::Similarity2f> transforms;
         std::vector<int> polyToContainer;
-        std::vector<int> containerSizes(containerVec.size());
-        for (uint32_t i=0; i<containerSizes.size(); i++)
-            containerSizes[i] = packingSize;
 
         int n = 0;
         do {

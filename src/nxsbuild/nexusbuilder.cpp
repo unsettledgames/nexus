@@ -531,12 +531,11 @@ namespace nx
         float error;
         float pixelXedge;
         if(!hasTextures()) {
-            cout << "Untextured" << endl;
             mesh1.serialize(buffer, header.signature, node_patches);
         } else {
             if(useNodeTex) {
                 std::unordered_map<int, int> faceToPatchTexture;
-                mesh.createPatch(header.signature, node_patches);
+                mesh.createPatches(header.signature, node_patches);
 
                 // Load texture data
                 QImage packedTexture;
@@ -641,7 +640,7 @@ namespace nx
             chunk = chunks.addChunk(mesh_size);
             uchar *chunk_buffer = chunks.getChunk(chunk);
             memcpy(chunk_buffer, buffer, mesh_size);
-            chunks.dropChunk(chunk); //no neede anymore
+            chunks.dropChunk(chunk); //not needed anymore
         }
         delete []buffer;
 
@@ -668,7 +667,6 @@ namespace nx
 
                 if(skipSimplifyLevels > 0)
                     nvert = ntriangles;
-
                 else if(nvert < 64) //don't simplify too much!
                     nvert = 64;
 
@@ -1036,9 +1034,10 @@ namespace nx
         uchar *buffer = chunks.getChunk(chunk, origin != destination);
 
         vcg::Point3f *point = (vcg::Point3f *)buffer;
-        int size = sizeof(vcg::Point3f) +
-                header.signature.vertex.hasTextures()*sizeof(vcg::Point2f) +
-                header.signature.vertex.hasColors() * sizeof(vcg::Color4b);
+        int size = sizeof(vcg::Point3f) + header.signature.vertex.hasTextures()*sizeof(vcg::Point2f);
+        if (header.version >= 2)
+            size += header.signature.vertex.hasColors() * sizeof(vcg::Color4b);
+
         vcg::Point3s *normal = (vcg::Point3s *)(buffer + size * node.nvert);
         uint16_t *face = (uint16_t *)(buffer + header.signature.vertex.size()*node.nvert);
 

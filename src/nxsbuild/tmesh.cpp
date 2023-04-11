@@ -366,7 +366,7 @@ namespace nx
         return size;
     }
 
-    void TMesh::createPatch(nx::Signature sig, std::vector<nx::Patch>& patches) {
+    void TMesh::createPatches(nx::Signature sig, std::vector<nx::Patch>& patches) {
         assert(vn == (int)vert.size());
         assert(fn == (int)face.size());
 
@@ -547,8 +547,6 @@ namespace nx
 
         vcg::tri::QuadricTexHelper<TMesh>::Quadric5Temp TD(this->vert,qv);
         vcg::tri::QuadricTexHelper<TMesh>::TDp()=&TD;
-
-
 
         vcg::LocalOptimization<TMesh> DeciSession(*this, &qparams);
 

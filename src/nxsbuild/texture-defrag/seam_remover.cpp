@@ -224,10 +224,11 @@ namespace Defrag
         if (dupVert > 0)
             LOG_INFO << "Removed " << dupVert << " duplicate vertices";
 
+        /*
         int zeroArea = tri::Clean<Mesh>::RemoveZeroAreaFace(m);
         if (zeroArea > 0)
             LOG_INFO << "Removed " << zeroArea << " zero area faces";
-
+        */
         tri::UpdateTopology<Mesh>::FaceFace(m);
 
         // orient faces coherently
@@ -236,23 +237,23 @@ namespace Defrag
 
         tri::UpdateTopology<Mesh>::FaceFace(m);
 
+        /*
         int numRemovedFaces = tri::Clean<Mesh>::RemoveNonManifoldFace(m);
         if (numRemovedFaces > 0)
             LOG_INFO << "Removed " << numRemovedFaces << " non-manifold faces";
-
+*/
         tri::Allocator<Mesh>::CompactEveryVector(m);
         tri::UpdateTopology<Mesh>::FaceFace(m);
 
-        Compute3DFaceAdjacencyAttribute(m);
+        Defrag::Compute3DFaceAdjacencyAttribute(m);
 
-        CutAlongSeams(m);
+        Defrag::CutAlongSeams(m);
         tri::Allocator<Mesh>::CompactEveryVector(m);
 
         *vndup = m.VN();
 
         tri::UpdateTopology<Mesh>::FaceFace(m);
-        while (tri::Clean<Mesh>::SplitNonManifoldVertex(m, 0))
-            ;
+        while (tri::Clean<Mesh>::SplitNonManifoldVertex(m, 0));
         tri::UpdateTopology<Mesh>::VertexFace(m);
 
         tri::Allocator<Mesh>::CompactEveryVector(m);
