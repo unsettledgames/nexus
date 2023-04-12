@@ -9,14 +9,14 @@ QMAKE_CXXFLAGS += -std=c++11
 
 DEFINES += _FILE_OFFSET_BITS=64 TEXTURE
 DEFINES += _USE_MATH_DEFINES
-DEFINES += NDEBUG
 
 INCLUDEPATH += \
     ../../../vcglib \
     ../../../vcglib/eigenlib
 
-win32:INCLUDEPATH += ../../../glew/include ../../../corto/include
-win32:LIBS += opengl32.lib GLU32.lib ../../../glew/lib/glew32.lib ../../../corto/lib/corto.lib
+win32:INCLUDEPATH += "C:/Program Files/vcpkg/packages/glew_x64-windows/include" ../../../corto/include
+win32:LIBS += opengl32.lib GLU32.lib "C:/Program Files/vcpkg/packages/glew_x64-windows/lib/glew32.lib" ../../../corto/Build/Debug/cortod.lib \
+    "C:\Users\nicol\Desktop\Lavoro\Repo\corto\Build\deps\lz4\build\cmake\Release\lz4.lib"
 
 unix:INCLUDEPATH += /usr/local/lib
 unix:LIBS += -L /usr/local/lib -lcorto
@@ -28,10 +28,6 @@ SOURCES += \
     ../common/nexusdata.cpp \
     ../common/traversal.cpp \
     ../common/cone.cpp \
-    ../nxszip/meshcoder.cpp \
-    ../nxszip/meshdecoder.cpp \
-    ../nxszip/abitstream.cpp \
-    ../nxszip/atunstall.cpp \
     main.cpp \
     extractor.cpp \
     ../common/qtnexusfile.cpp
@@ -48,11 +44,6 @@ HEADERS += \
     ../nxszip/fpu_precision.h \
     ../nxszip/bytestream.h \
     ../nxszip/math_class.h \
-    ../nxszip/bitstream.h \
-    ../nxszip/tunstall.h \
-    ../nxszip/cstream.h \
-    ../nxszip/meshcoder.h \
-    ../nxszip/meshdecoder.h \
     extractor.h \
     ../common/qtnexusfile.h
 

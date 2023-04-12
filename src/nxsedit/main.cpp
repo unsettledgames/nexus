@@ -104,7 +104,6 @@ int main(int argc, char *argv[]) {
 
 	//compression and quantization options
 	opt.addSwitch('z', "compress", "compress patches", &compress);
-	opt.addOption('Z', "compression library", "pick among compression libs [corto, meco (deprecated)], default corto [requires -z]", &compresslib);
 	opt.addOption('v', "vertex quantization", "absolute side of quantization grid [requires -z]", &coord_step);
 	opt.addOption('V', "vertex bits", "number of bits in vertex coordinates when compressing [requires -z]", &position_bits);
 	opt.addOption('Y', "luma bits", "quantization of luma channel, default 6 [requires -z]", &luma_bits);

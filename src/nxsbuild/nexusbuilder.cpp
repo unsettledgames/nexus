@@ -27,6 +27,7 @@ for more details.
 #include <QOpenGLWidget>
 #include "vertex_cache_optimizer.h"
 
+#include "../nexus/src/common/nexusdata.h"
 #include "nexusbuilder.h"
 #include "kdtree.h"
 #include "meshstream.h"
@@ -218,7 +219,6 @@ namespace nx
 
     QImage NexusBuilder::extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, std::unordered_map<int, int>& faceToPatchTexture,
                                         int level, float &error, float &pixelXedge) {
-        cout << "Extracting textures" << endl;
         // Set default parameters for defragmenter
         Defrag::AlgoParameters ap;
 
@@ -234,8 +234,6 @@ namespace nx
         Defrag::TextureObjectHandle textureObject = std::make_shared<Defrag::TextureObject>();
         for (auto& img : toDefrag)
             textureObject->AddImage(img);
-
-        cout << "Copy mesh" << endl;
 
         // Create Defrag::Mesh
         Defrag::Mesh defragMesh;
@@ -270,8 +268,6 @@ namespace nx
         tri::UpdateNormal<Defrag::Mesh>::PerFaceNormalized(defragMesh);
         tri::UpdateNormal<Defrag::Mesh>::PerVertexNormalized(defragMesh);
 
-        cout << "Cleaned mesh" << endl;
-
         Defrag::ScaleTextureCoordinatesToImage(defragMesh, textureObject);
 
         // Prepare mesh
@@ -294,13 +290,6 @@ namespace nx
         Defrag::GreedyOptimization(graph, state, ap);
         int vndupOut;
         Defrag::Finalize(graph, &vndupOut);
-
-        /* [USELESS?]
-        bool colorize = true;
-
-        if (colorize)
-            tri::UpdateColor<Defrag::Mesh>::PerFaceConstant(m, vcg::Color4b(91, 130, 200, 255));
-        */
 
         // Rotate charts
         for (auto entry : graph->charts) {
@@ -369,22 +358,16 @@ namespace nx
         std::vector<std::shared_ptr<QImage>> newTextures = Defrag::RenderTexture(defragMesh, textureObject, texszVec, true,
             Defrag::RenderMode::Linear);
 
-        cout << "Rendered" << endl;
-
         mesh.face.resize(defragMesh.FN());
         mesh.fn = defragMesh.FN();
         mesh.vert.resize(defragMesh.VN());
         mesh.vn = defragMesh.VN();
-
-        cout << "Resized buffers" << endl;
 
         for (int i = 0; i < defragMesh.VN(); ++i) {
             mesh.vert[i].P().X() = defragMesh.vert[i].P().X();
             mesh.vert[i].P().Y() = defragMesh.vert[i].P().Y();
             mesh.vert[i].P().Z() = defragMesh.vert[i].P().Z();
         }
-
-        cout << "Copied vertices" << endl;
 
         for (int i = 0; i < defragMesh.FN(); ++i) {
             for (int k = 0; k < 3; ++k) {
@@ -393,7 +376,7 @@ namespace nx
 
                 mesh.face[i].WT(k).U() = defragMesh.face[i].cWT(k).U();
                 mesh.face[i].WT(k).V() = defragMesh.face[i].cWT(k).V();
-                mesh.face[i].WT(k).N() = defragMesh.face[i].cWT(k).N();
+                mesh.face[i].WT(k).N() = 0;
             }
         }
 
@@ -500,45 +483,28 @@ namespace nx
             }
         }
 
+        std::vector<Patch> node_patches;
+        uchar *buffer;
+        float error;
+        float pixelXedge;
 
         if(!hasTextures()) {
             //no need to mutex the input, it won't change anything.
             input->lock(mesh1, block);
             mesh_size = mesh1.serializedSize(header.signature);
 
-        } else {
-            mesh.splitSeams(header.signature);
-            mesh_size = mesh.serializedSize(header.signature);
-
-
-            /*
-            static int n = 0;
-            QString texname = "Loaded" + QString::number(n) +  ".jpg";
-
-            QImageWriter rewriter(texname, "jpg");
-            rewriter.setQuality(100);
-            if (level == 0)
-                rewriter.write(originalTextures[0]);
-            mesh.savePlyTex("Loaded" + QString::number(n) + ".ply", texname);
-            n++;
-            */
-        }
-        mesh_size = pad(mesh_size);
-
-        uchar *buffer = new uchar[mesh_size];
-        std::vector<Patch> node_patches;
-
-        float error;
-        float pixelXedge;
-        if(!hasTextures()) {
+            buffer = new uchar[mesh_size];
             mesh1.serialize(buffer, header.signature, node_patches);
-        } else {
+        }
+        else {
+            QImage packedTexture;
+            mesh.splitSeams(header.signature);
+
             if(useNodeTex) {
                 std::unordered_map<int, int> faceToPatchTexture;
                 mesh.createPatches(header.signature, node_patches);
 
                 // Load texture data
-                QImage packedTexture;
                 if (level == 0) {
                     packedTexture = extractNodeTex(mesh, originalTextures, faceToPatchTexture, level, error, pixelXedge);
                 }
@@ -561,10 +527,9 @@ namespace nx
                         {
                             Texture tex = textures[toDefrag[i]];
                             uint64_t offset = tex.getBeginOffset();
-                            uint64_t endOffset = (i == toDefrag.size() - 1) ? nodeTex.size() : tex.getEndOffset();
+                            uint64_t endOffset = (i == toDefrag.size() - 1) ? nodeTex.size() : textures[toDefrag[i]+1].getBeginOffset();
                             uint64_t dataSize = endOffset - offset;
 
-                            std::cout << "Start: " << offset << " end: " << endOffset << " size: " << dataSize << std::endl;
                             nodeTex.seek(offset);
 
                             uint8_t* data;
@@ -580,11 +545,50 @@ namespace nx
                         nodeTex.seek(nodeTex.size());
                     }
 
+                    static int p = 10;
+                    for (auto& img : texImages)
+                    {
+                        img.save(QString::number(p) + ".jpg");
+                        p++;
+                    }
+
+                    std::cout << "N images: " << texImages.size() << std::endl;
                     packedTexture = extractNodeTex(mesh, texImages, faceToPatchTexture, level, error, pixelXedge);
                 }
 
-                mesh.splitSeams(header.signature);
-                mesh.serialize(buffer, header.signature, node_patches);
+                /*
+                 * TODO:
+                 * - preserva nodi di origine
+                 */
+
+                TMesh tmp;
+                vcg::tri::Append<TMesh,TMesh>::MeshCopy(tmp, mesh);
+                for(int i = 0; i < tmp.face.size(); i++) {
+                    tmp.face[i].node = mesh.face[i].node;
+                    tmp.face[i].tex = mesh.face[i].tex;
+                }
+
+                tmp.splitSeams(header.signature);
+                mesh_size = pad(tmp.serializedSize(header.signature));
+
+                buffer = new uchar[mesh_size];
+                tmp.serialize(buffer, header.signature, node_patches);
+
+
+            #define DEBUG_TEXTURES
+                #ifdef DEBUG_TEXTURES
+                cout << "Saving test meshes and textures" << endl;
+                static int counter = 0;
+
+                QString texname = QString::number(counter) + ".jpg";
+                QImageWriter rewriter(texname, "jpg");
+                rewriter.setQuality(tex_quality);
+                rewriter.write(packedTexture);
+
+                tmp.textures.push_back(texname.toStdString());
+                tmp.savePlyTex(QString::number(counter) + ".ply", texname);
+                counter++;
+            #endif
 
                 Texture t;
                 {
@@ -600,6 +604,7 @@ namespace nx
                     writer.setProgressiveScanWrite(true);
     #endif
                     writer.write(packedTexture);
+                    assert(wrote);
 
                     quint64 size = pad(nodeTex.size());
                     nodeTex.resize(size);
@@ -611,28 +616,9 @@ namespace nx
                     for(Patch &patch: node_patches)
                         patch.texture = textures.size()-1; //last texture inserted
                 }
-
-                #define DEBUG_TEXTURES
-    #ifdef DEBUG_TEXTURES
-                cout << "Saving test meshes and textures" << endl;
-                static int counter = 0;
-
-                QString texname = QString::number(counter) + ".jpg";
-                QImageWriter rewriter(texname, "jpg");
-                rewriter.setQuality(tex_quality);
-                rewriter.write(packedTexture);
-
-                mesh.textures.push_back(texname.toStdString());
-                mesh.savePlyTex(QString::number(counter) + ".ply", texname);
-                counter++;
-    #endif
             }
-
-            //VICIUOS TRICK: we could save only a texture every 2 geometry levels since the patch is contained also to a parent node.
-            //we could store the texture in the parent nodes i and have it good also for the children node.
-            //but only starting from the bottom.
-
         }
+
         quint32 chunk;
         //done serializing, move the data to the chunk.
         {
@@ -694,6 +680,8 @@ namespace nx
 
             nodes.push_back(node);
             boxes.push_back(NodeBox(input, block));
+
+            std::cout << "Patches ok" << std::endl;
         }
 
 
@@ -716,6 +704,7 @@ namespace nx
                     cout << "Degenerate" << endl;
             }
         }
+        std::cout << "Finished" << std::endl;
         delete []triangles;
     }
 
@@ -809,11 +798,16 @@ namespace nx
         if(!file.open(QIODevice::ReadWrite | QIODevice::Truncate))
             throw QString("could not open file " + filename);
 
+        std::cout << "File" << std::endl;
         if(header.signature.vertex.hasNormals() && header.signature.face.hasIndex())
             uniformNormals();
 
+        std::cout << "Normals" << std::endl;
+
         if(textures.size())
             textures.push_back(Texture());
+
+        std::cout << "Textures" << std::endl;
 
         header.nface = 0;
         header.nvert = 0;
@@ -836,6 +830,8 @@ namespace nx
         for(uint32_t i = 0; i < nroots; i++)
             header.sphere.Add(nodes[i].tightSphere());
 
+        std::cout << "Here" << std::endl;
+
         for(uint i = 0; i < nodes.size()-1; i++) {
             nx::Node &node = nodes[i];
             header.nface += node.nface;
@@ -852,6 +848,7 @@ namespace nx
         std::vector<quint32> node_chunk; //for each node the corresponding chunk
         for(quint32 i = 0; i < nodes.size()-1; i++)
             node_chunk.push_back(nodes[i].offset);
+        std::cout << "nodes" << std::endl;
 
         //compute offsets and store them in nodes
         for(uint i = 0; i < nodes.size()-1; i++) {
@@ -884,6 +881,7 @@ namespace nx
                 }
             }
         }
+        std::cout << "Textures" << std::endl;
 
         qint64 r = file.write((char*)&header, sizeof(Header));
         if(r == -1)
@@ -895,6 +893,8 @@ namespace nx
         if(textures.size())
             file.write((char*)&(textures[0]), sizeof(Texture)*textures.size());
         file.seek(index_size);
+
+        std::cout << "Wrote" << std::endl;
 
         //NODES
         QString basename = filename.left(filename.size() - 4) + "_files";
@@ -913,6 +913,8 @@ namespace nx
             } else
                 file.write((char*)buffer, chunks.chunkSize(chunk));
         }
+
+        std::cout << "nodes 2" << std::endl;
 
         //TEXTURES
         //	QString basename = filename.left(filename.length()-4);
@@ -965,6 +967,7 @@ namespace nx
                 }
             }
         }
+        std::cout << "nodes2" << std::endl;
         if(textures.size())
             for(int i = 0; i < textures.size()-1; i++) {
                 QFile::remove(QString("nexus_tmp_tex%1.png").arg(i));
@@ -1035,8 +1038,7 @@ namespace nx
 
         vcg::Point3f *point = (vcg::Point3f *)buffer;
         int size = sizeof(vcg::Point3f) + header.signature.vertex.hasTextures()*sizeof(vcg::Point2f);
-        if (header.version >= 2)
-            size += header.signature.vertex.hasColors() * sizeof(vcg::Color4b);
+        size += header.signature.vertex.hasColors() * sizeof(vcg::Color4b);
 
         vcg::Point3s *normal = (vcg::Point3s *)(buffer + size * node.nvert);
         uint16_t *face = (uint16_t *)(buffer + header.signature.vertex.size()*node.nvert);
@@ -1052,7 +1054,7 @@ namespace nx
 
 
     void NexusBuilder::uniformNormals() {
-        cout << "Unifying normals\n";
+        cout << "Unifying normals\n" << endl;
         /*
         level 0: for each node in the lowest level:
                 load the neighboroughs
@@ -1069,6 +1071,7 @@ namespace nx
 
         uint32_t sink = nodes.size()-1;
         for(int t = sink-1; t > 0; t--) {
+            std::cout << t << std::endl;
             Node &target = nodes[t];
 
             vcg::Box3f box = boxes[t].box;
