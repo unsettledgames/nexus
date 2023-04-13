@@ -96,17 +96,19 @@ namespace nx
 
     vector<bool> NodeBox::markBorders(Node &node, vcg::Point3f *p, uint16_t *f) {
         vector<bool> border(node.nvert, false);
+        std::cout << node.nface << std::endl;
         for(int i = 0; i < node.nface; i++) {
             bool outside = false;
             for(int k = 0; k < 3; k++) {
                 uint16_t index = f[i*3 + k];
                 outside |= !isIn(p[index]);
             }
-            if(outside)
+            if(outside) {
                 for(int k = 0; k < 3; k++) {
                     uint16_t index = f[i*3 + k];
                     border[index] = true;
                 }
+            }
         }
         return border;
     }
@@ -241,14 +243,16 @@ namespace nx
         auto fi = tri::Allocator<Defrag::Mesh>::AddFaces(defragMesh, mesh.FN());
         auto vi = tri::Allocator<Defrag::Mesh>::AddVertices(defragMesh, mesh.VN());
 
-        for (int i = 0; i < mesh.VN(); ++i) {
+        for (int i = 0; i < mesh.vert.size(); ++i) {
             vi->P().X() = mesh.vert[i].P().X();
             vi->P().Y() = mesh.vert[i].P().Y();
             vi->P().Z() = mesh.vert[i].P().Z();
             ++vi;
         }
 
-        for (int i = 0; i < mesh.FN(); ++i) {
+        for (int i = 0; i < mesh.face.size(); ++i) {
+            defragMesh.face[i].node = mesh.face[i].node;
+
             for (int k = 0; k < 3; ++k) {
                 fi->V(k) = &defragMesh.vert[mesh.face[i].cV(k) - &(*mesh.vert.begin())];
                 fi->WT(k).U() = mesh.face[i].cWT(k).U();
@@ -358,6 +362,14 @@ namespace nx
         std::vector<std::shared_ptr<QImage>> newTextures = Defrag::RenderTexture(defragMesh, textureObject, texszVec, true,
             Defrag::RenderMode::Linear);
 
+        std::cout << "Before deleting: " << defragMesh.vert.size() << " vs " << defragMesh.vn << "\n" <<
+                     defragMesh.face.size() << " vs " << defragMesh.fn << std::endl;
+
+        tri::Allocator<Defrag::Mesh>::CompactEveryVector(defragMesh);
+
+        assert(defragMesh.vn == defragMesh.vert.size() && defragMesh.vn == defragMesh.VN());
+        assert(defragMesh.fn == defragMesh.face.size() && defragMesh.fn == defragMesh.FN());
+
         mesh.face.resize(defragMesh.FN());
         mesh.fn = defragMesh.FN();
         mesh.vert.resize(defragMesh.VN());
@@ -373,10 +385,10 @@ namespace nx
             for (int k = 0; k < 3; ++k) {
                 mesh.face[i].V(k) = &mesh.vert[defragMesh.face[i].cV(k) - &(*defragMesh.vert.begin())];
                 mesh.face[i].P(k) = defragMesh.face[i].P(k);
+                mesh.face[i].node = defragMesh.face[i].node;
 
                 mesh.face[i].WT(k).U() = defragMesh.face[i].cWT(k).U();
                 mesh.face[i].WT(k).V() = defragMesh.face[i].cWT(k).V();
-                mesh.face[i].WT(k).N() = 0;
             }
         }
 
@@ -464,6 +476,8 @@ namespace nx
 
     void NexusBuilder::processBlock(KDTreeSoup *input, StreamSoup *output, uint block, int level) {
         TMesh mesh;
+        TMesh tmp;
+
         Mesh mesh1;
 
         quint32 mesh_size;
@@ -544,24 +558,14 @@ namespace nx
 
                         nodeTex.seek(nodeTex.size());
                     }
-
-                    static int p = 10;
-                    for (auto& img : texImages)
-                    {
-                        img.save(QString::number(p) + ".jpg");
-                        p++;
-                    }
-
-                    std::cout << "N images: " << texImages.size() << std::endl;
                     packedTexture = extractNodeTex(mesh, texImages, faceToPatchTexture, level, error, pixelXedge);
                 }
 
                 /*
                  * TODO:
-                 * - preserva nodi di origine
+                 * - non crashare alla fine
                  */
 
-                TMesh tmp;
                 vcg::tri::Append<TMesh,TMesh>::MeshCopy(tmp, mesh);
                 for(int i = 0; i < tmp.face.size(); i++) {
                     tmp.face[i].node = mesh.face[i].node;
@@ -575,8 +579,8 @@ namespace nx
                 tmp.serialize(buffer, header.signature, node_patches);
 
 
-            #define DEBUG_TEXTURES
-                #ifdef DEBUG_TEXTURES
+                #define DEBUG_TEXTURES
+            #ifdef DEBUG_TEXTURES
                 cout << "Saving test meshes and textures" << endl;
                 static int counter = 0;
 
@@ -634,7 +638,7 @@ namespace nx
         if(!hasTextures())
             node = mesh1.getNode(); //get node data before simplification
         else
-            node = mesh.getNode();
+            node = tmp.getNode();
 
         int nface;
         {
@@ -659,7 +663,7 @@ namespace nx
                 float e = mesh.simplify(nvert, TMesh::QUADRICS);
                 if(!useNodeTex)
                     error = e;
-                nface = mesh.fn;
+                nface = mesh.FN();
             }
         }
 
@@ -704,6 +708,7 @@ namespace nx
                     cout << "Degenerate" << endl;
             }
         }
+
         std::cout << "Finished" << std::endl;
         delete []triangles;
     }
@@ -1029,6 +1034,8 @@ namespace nx
 
     /* extracts vertices in origin which intersects destination box */
     void NexusBuilder::appendBorderVertices(uint32_t origin, uint32_t destination, std::vector<NVertex> &vertices) {
+        std::cout << "Origin node: " << origin << std::endl;
+        std::cout << "Destination node: " << destination << std::endl;
         Node &node = nodes[origin];
         uint32_t chunk = node.offset; //chunk index was stored here.
 
@@ -1041,11 +1048,15 @@ namespace nx
         size += header.signature.vertex.hasColors() * sizeof(vcg::Color4b);
 
         vcg::Point3s *normal = (vcg::Point3s *)(buffer + size * node.nvert);
+        std::cout << "N vertices per node: " << node.nvert << std::endl;
         uint16_t *face = (uint16_t *)(buffer + header.signature.vertex.size()*node.nvert);
 
         NodeBox &nodebox = boxes[origin];
 
+        std::cout << "Setup ok" << std::endl;
         vector<bool> border = nodebox.markBorders(node, point, face);
+        std::cout << "Marked borders" << std::endl;
+
         for(int i = 0; i < node.nvert; i++) {
             if(border[i])
                 vertices.push_back(NVertex(origin, i, point[i], normal + i));
@@ -1077,9 +1088,10 @@ namespace nx
             vcg::Box3f box = boxes[t].box;
             //box.Offset(box.Diag()/100);
             box.Offset(box.Diag()/10);
-
             vertices.clear();
+            std::cout << "Appending..." << std::endl;
             appendBorderVertices(t, t, vertices);
+            std::cout << "Appended vertices" << std::endl;
 
             bool last_level = (patches[target.first_patch].node == sink);
 
@@ -1091,6 +1103,7 @@ namespace nx
                     if(!box.Collide(boxes[n].box)) continue;
 
                     appendBorderVertices(n, t, vertices);
+                    std::cout << "Appended vertices 2" << std::endl;
                 }
 
             } else { //again among childrens.
@@ -1099,6 +1112,7 @@ namespace nx
                     uint n = patches[p].node;
 
                     appendBorderVertices(n, t, vertices);
+                    std::cout << "Appended vertices 2_" << n << std::endl;
                 }
             }
 

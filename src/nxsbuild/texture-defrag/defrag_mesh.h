@@ -83,6 +83,7 @@ namespace Defrag
     class MeshFace : public Face<MeshUsedTypes, FaceQualifier, face::VertexRef, face::FFAdj, face::VFAdj, face::Mark, face::WedgeTexCoord2d, face::Normal3d, face::Color4b, face::Qualityf, face::BitFlags>
     {
     public:
+        int node;
         RegionID id = INVALID_ID;
         RegionID initialId = INVALID_ID;
     };
