@@ -34,6 +34,7 @@ SOURCES += \
     plyloader.cpp \
     kdtree.cpp \
     mesh.cpp \
+    textureextractor.cpp \
     tsploader.cpp \
     nexusbuilder.cpp \
     objloader.cpp \
@@ -66,11 +67,13 @@ HEADERS += \
     ../common/signature.h \
     ../common/cone.h \
     ../common/virtualarray.h \
+    Instrumentor.h \
     meshstream.h \
     meshloader.h \
     plyloader.h \
     partition.h \
     kdtree.h \
+    textureextractor.h \
     trianglesoup.h \
     mesh.h \
     tsploader.h \

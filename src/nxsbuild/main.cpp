@@ -33,156 +33,160 @@ for more details.
 #include "objloader.h"
 #include "tsploader.h"
 
+#include <Instrumentor.h>
+
 using namespace std;
 using namespace nx;
 
 int main(int argc, char *argv[]) {
 
-	// we create a QCoreApplication just so that QT loads image IO plugins (for jpg and tiff loading)
+    PROFILE_BEGIN_SESSION("NexusRuntime", "runtime.json");
+
+    // we create a QCoreApplication just so that QT loads image IO plugins (for jpg and tiff loading)
     QApplication myUselessApp(argc, argv);
     Q_UNUSED(myUselessApp);
 
-	setlocale(LC_ALL, "C");
+    setlocale(LC_ALL, "C");
     QLocale::setDefault(QLocale::C);
 
     std::cout << "Init OpenGL" << std::endl;
 
 
-	int node_size = 1<<15;
-	float texel_weight =0.05; //relative weight of texels.
+    int node_size = 1<<15;
+    float texel_weight =0.05; //relative weight of texels.
 
-	int top_node_size = 4096;
-	float vertex_quantization = 0.0f;   //optionally quantize vertices position.
-	int tex_quality(95);                //default jpg texture quality
-	//QString decimation("quadric");      //simplification method
-	int ram_buffer(2000);               //Mb of ram to use
-    int n_threads = 1;
-	float scaling(0.5);                 //simplification ratio
-	int skiplevels = 0;
-	QString output("");                 //output file
-	QString mtl;
-	QString translate;
-	bool center = false;
-
-
-	bool point_cloud = false;
-	bool normals = false;
-	bool no_normals = false;
-	bool colors = false;
-	bool no_colors = false;
-	bool no_texcoords = false;
-	bool useOrigTex = false;
-	bool create_pow_two_tex = false;
-	bool deepzoom = false;
-
-	//BTREE options
-	QVariant adaptive(0.333f);
-
-	GetOpt opt(argc, argv);
-	QString help("ARGS specify a ply, obj, stl, tsp  file (specify more files or just the directory containing them to get a merged output)");
-	opt.setHelp(help);
-
-	opt.allowUnlimitedArguments(true); //able to join several files
-
-	//extraction options
-	opt.addOption('o', "output filename", "filename of the nexus output file", &output);
-
-	//construction options
-	opt.addOption('f', "node-faces", "number of faces per patch, (min ~1000, max 32768, default 32768)\n"
-				  "This parameter controls the granularity of the multiresolution: smaller values result in smaller changes (less 'pop')"
-				  "Small nodes are less efficient in rendering and compression.\n"
-				  "Meshes with very large textures and few vertices benefit from small nodes.", &node_size);
-	opt.addOption('F', "texel-weight", "texels weight are included in node-face computation", &texel_weight);
-	opt.addOption('t', "top node faces", "number of triangles in the top node, default 4096\n"
-				  "Controls the size of the smallest LOD. Higher values will delay the first rendering but with higher quality.", &top_node_size);
-	//opt.addOption('d', "decimation", "decimation method [quadric, edgelen], default quadric", &decimation);
-	opt.addOption('s', "scaling", "decimation factor between levels, default 0.5", &scaling);
-	opt.addOption('S', "skiplevels", "decimation skipped for n levels, default 0\n"
-				  "Use for meshes with large textures and very few vertices.", &skiplevels);
-	opt.addSwitch('O', "original textures", "use original textures, no repacking (deprecated)", &useOrigTex);
-	opt.addOption('m', "mtl file", "mtl for a single obj file", &mtl);
-	opt.addSwitch('k', "pow 2 textures", "create textures to be power of 2\n"
-				  "Allows mipmaps, it will increase GPU memory required.", &create_pow_two_tex);
-	opt.addSwitch('D', "deepzoom", "save each node and texture to a separated file\n"
-				  "Used for server which do not support http range requests (206). Will generate MANY files.", &deepzoom);
-
-	//btree options
-	opt.addOption('a', "adaptive", "split nodes adaptively [0-1], default 0.333\n"
-				  "Different settings might help with very uneven distribution of geometry.", &adaptive);
-
-	opt.addOption('v', "vertex quantization", "vertex quantization grid size (might be approximated)", &vertex_quantization);
-	opt.addOption('q', "texture quality", "JPEG texture quality [0-100], default 95", &tex_quality);
-
-	//format options
-	opt.addSwitch('p', "point cloud", "generate a multiresolution point cloud (needed only to discard faces)", &point_cloud);
-
-	opt.addSwitch('N', "normals", "force per vertex normals, even in point clouds", &normals);
-	opt.addSwitch('n', "no normals", "do not store per vertex normals", &no_normals);
-	opt.addSwitch('C', "colors", "save vertex colors", &colors);
-	opt.addSwitch('c', "no colors", "do not store per vertex colors", &no_colors);
-	opt.addSwitch('u', "no textures", "do not store textures and vertex texture coordinates", &no_texcoords);
+    int top_node_size = 4096;
+    float vertex_quantization = 0.0f;   //optionally quantize vertices position.
+    int tex_quality(95);                //default jpg texture quality
+    //QString decimation("quadric");      //simplification method
+    int ram_buffer(2000);               //Mb of ram to use
+    int n_threads = 4;
+    float scaling(0.5);                 //simplification ratio
+    int skiplevels = 0;
+    QString output("");                 //output file
+    QString mtl;
+    QString translate;
+    bool center = false;
 
 
-	//other options
-	opt.addOption('r', "ram", "max ram used (in MegaBytes), default 2000 (WARNING: just an approximation)", &ram_buffer);
-	opt.addOption('w', "workers", "number of workers: default = 4", &n_threads);
-	opt.addOption('T', "origin", "new origin for the model in the format X:Y:Z", &translate);
-	opt.addSwitch('G', "center", "set origin in the bounding box center of the input meshes", &center);
-	opt.parse();
+    bool point_cloud = false;
+    bool normals = false;
+    bool no_normals = false;
+    bool colors = false;
+    bool no_colors = false;
+    bool no_texcoords = false;
+    bool useOrigTex = false;
+    bool create_pow_two_tex = false;
+    bool deepzoom = false;
 
-	//Check parameters are correct
-	QStringList inputs = opt.arguments;
-	if(inputs.size() == 0) {
-		cerr << "No input files specified" << endl;
-		cerr << qPrintable(opt.usage()) << endl;
-		return -1;
-	}
+    //BTREE options
+    QVariant adaptive(0.333f);
 
-	if(inputs.size() == 1) { //check for directory parameter
-		QDir dir(inputs[0]);
-		if(dir.exists()) {
-			QStringList filters;
-			filters << "*.ply" << "*.obj" << "*.stl" << "*.tsp"; //append your xml filter. You can add other filters here
-			inputs = dir.entryList(filters, QDir::Files);
-			if(inputs.size() == 0) {
-				cerr << "Empty directory" << endl;
-				return -1;
-			}
-			for(QString &s: inputs)
-				s = dir.filePath(s);
-		}
-	}
+    GetOpt opt(argc, argv);
+    QString help("ARGS specify a ply, obj, stl, tsp  file (specify more files or just the directory containing them to get a merged output)");
+    opt.setHelp(help);
 
-	if(output == "") output = inputs[0].left(inputs[0].length()-4);
-	if(!output.endsWith(".nxs"))
-		output += ".nxs";
+    opt.allowUnlimitedArguments(true); //able to join several files
 
-	if(node_size < 1000 || node_size >= 1<<16) {
-		cerr << "Patch size (" << node_size << ") out of bounds [1000-65536]" << endl;
-		return -1;
-	}
+    //extraction options
+    opt.addOption('o', "output filename", "filename of the nexus output file", &output);
 
-	vcg::Point3d origin(0, 0, 0);
-	if(!translate.isEmpty()) {
-		QStringList p = translate.split(':');
-		if(p.size() != 3) {
-			cerr << "Malformed translate parameter, expecting X:Y:Z" << endl;
-			return -1;
-		}
+    //construction options
+    opt.addOption('f', "node-faces", "number of faces per patch, (min ~1000, max 32768, default 32768)\n"
+                  "This parameter controls the granularity of the multiresolution: smaller values result in smaller changes (less 'pop')"
+                  "Small nodes are less efficient in rendering and compression.\n"
+                  "Meshes with very large textures and few vertices benefit from small nodes.", &node_size);
+    opt.addOption('F', "texel-weight", "texels weight are included in node-face computation", &texel_weight);
+    opt.addOption('t', "top node faces", "number of triangles in the top node, default 4096\n"
+                  "Controls the size of the smallest LOD. Higher values will delay the first rendering but with higher quality.", &top_node_size);
+    //opt.addOption('d', "decimation", "decimation method [quadric, edgelen], default quadric", &decimation);
+    opt.addOption('s', "scaling", "decimation factor between levels, default 0.5", &scaling);
+    opt.addOption('S', "skiplevels", "decimation skipped for n levels, default 0\n"
+                  "Use for meshes with large textures and very few vertices.", &skiplevels);
+    opt.addSwitch('O', "original textures", "use original textures, no repacking (deprecated)", &useOrigTex);
+    opt.addOption('m', "mtl file", "mtl for a single obj file", &mtl);
+    opt.addSwitch('k', "pow 2 textures", "create textures to be power of 2\n"
+                  "Allows mipmaps, it will increase GPU memory required.", &create_pow_two_tex);
+    opt.addSwitch('D', "deepzoom", "save each node and texture to a separated file\n"
+                  "Used for server which do not support http range requests (206). Will generate MANY files.", &deepzoom);
 
-		bool ok = false;
-		for(int i = 0; i < 3; i++) {
-			origin[i] = p[i].toDouble(&ok);
-			if(!ok) {
-				cerr << "Malformed translate parameter, expecting X:Y:Z" << endl;
-				return -1;
-			}
-		}
-		if(center) {
-			cerr << "Can't specify both --center (-t) and --translate (-T)" << endl;
-			return -1;
-		}
-	}
+    //btree options
+    opt.addOption('a', "adaptive", "split nodes adaptively [0-1], default 0.333\n"
+                  "Different settings might help with very uneven distribution of geometry.", &adaptive);
+
+    opt.addOption('v', "vertex quantization", "vertex quantization grid size (might be approximated)", &vertex_quantization);
+    opt.addOption('q', "texture quality", "JPEG texture quality [0-100], default 95", &tex_quality);
+
+    //format options
+    opt.addSwitch('p', "point cloud", "generate a multiresolution point cloud (needed only to discard faces)", &point_cloud);
+
+    opt.addSwitch('N', "normals", "force per vertex normals, even in point clouds", &normals);
+    opt.addSwitch('n', "no normals", "do not store per vertex normals", &no_normals);
+    opt.addSwitch('C', "colors", "save vertex colors", &colors);
+    opt.addSwitch('c', "no colors", "do not store per vertex colors", &no_colors);
+    opt.addSwitch('u', "no textures", "do not store textures and vertex texture coordinates", &no_texcoords);
+
+
+    //other options
+    opt.addOption('r', "ram", "max ram used (in MegaBytes), default 2000 (WARNING: just an approximation)", &ram_buffer);
+    opt.addOption('w', "workers", "number of workers: default = 4", &n_threads);
+    opt.addOption('T', "origin", "new origin for the model in the format X:Y:Z", &translate);
+    opt.addSwitch('G', "center", "set origin in the bounding box center of the input meshes", &center);
+    opt.parse();
+
+    //Check parameters are correct
+    QStringList inputs = opt.arguments;
+    if(inputs.size() == 0) {
+        cerr << "No input files specified" << endl;
+        cerr << qPrintable(opt.usage()) << endl;
+        return -1;
+    }
+
+    if(inputs.size() == 1) { //check for directory parameter
+        QDir dir(inputs[0]);
+        if(dir.exists()) {
+            QStringList filters;
+            filters << "*.ply" << "*.obj" << "*.stl" << "*.tsp"; //append your xml filter. You can add other filters here
+            inputs = dir.entryList(filters, QDir::Files);
+            if(inputs.size() == 0) {
+                cerr << "Empty directory" << endl;
+                return -1;
+            }
+            for(QString &s: inputs)
+                s = dir.filePath(s);
+        }
+    }
+
+    if(output == "") output = inputs[0].left(inputs[0].length()-4);
+    if(!output.endsWith(".nxs"))
+        output += ".nxs";
+
+    if(node_size < 1000 || node_size >= 1<<16) {
+        cerr << "Patch size (" << node_size << ") out of bounds [1000-65536]" << endl;
+        return -1;
+    }
+
+    vcg::Point3d origin(0, 0, 0);
+    if(!translate.isEmpty()) {
+        QStringList p = translate.split(':');
+        if(p.size() != 3) {
+            cerr << "Malformed translate parameter, expecting X:Y:Z" << endl;
+            return -1;
+        }
+
+        bool ok = false;
+        for(int i = 0; i < 3; i++) {
+            origin[i] = p[i].toDouble(&ok);
+            if(!ok) {
+                cerr << "Malformed translate parameter, expecting X:Y:Z" << endl;
+                return -1;
+            }
+        }
+        if(center) {
+            cerr << "Can't specify both --center (-t) and --translate (-T)" << endl;
+            return -1;
+        }
+    }
 
     Stream *stream = 0;
     KDTree *tree = 0;
@@ -319,8 +323,9 @@ int main(int argc, char *argv[]) {
         returncode = 1;
     }
 
-	if(tree)   delete tree;
-	if(stream) delete stream;
+    if(tree)   delete tree;
+    if(stream) delete stream;
 
-	return returncode;
+     PROFILE_END_SESSION();
+    return returncode;
 }

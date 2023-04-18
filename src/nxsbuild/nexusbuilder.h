@@ -151,7 +151,6 @@ public:
 
 	void processBlock(KDTreeSoup *input, StreamSoup *output, uint block, int level);
 
-      QImage extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, std::unordered_map<int, int>& faceToPatchTexture, int level, float &error, float &pixelXedge);
 	void invertNodes(); //
 	void saturateNode(quint32 n);
 	void optimizeNode(quint32 node, uchar *chunk);

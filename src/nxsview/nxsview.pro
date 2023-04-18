@@ -1,6 +1,8 @@
 QT       += core gui opengl widgets
 
 TARGET   = nxsview
+CONFIG += console
+CONFIG -= app_bundle
 TEMPLATE = app
 
 QMAKE_CXXFLAGS += -std=c++11
@@ -8,16 +10,22 @@ QMAKE_CXXFLAGS += -std=c++11
 DEFINES += GL_COMPATIBILITY
 DEFINES += NDEBUG
 
+win32-msvc: DEFINES += NOMINMAX
+
 unix:DEFINES -= USE_CURL
 win32:DEFINES += NOMINMAX
+DEFINES += _FILE_OFFSET_BITS=64
+DEFINES += _USE_MATH_DEFINES
 
-INCLUDEPATH += \
-    ../../../vcglib \
+win32:INCLUDEPATH += ../../../glew/include \
+    ../../../corto/include \
+    ./../../../vcglib \
     ../../../vcglib/eigenlib
 
-win32:INCLUDEPATH += "C:/Program Files/vcpkg/packages/glew_x64-windows/include" ../../../corto/include
-win32:LIBS += opengl32.lib GLU32.lib "C:/Program Files/vcpkg/packages/glew_x64-windows/lib/glew32.lib" ../../../corto/Build/Debug/cortod.lib \
-            "C:\Users\nicol\Desktop\Lavoro\Repo\corto\Build\deps\lz4\build\cmake\Release\lz4.lib"
+win32:LIBS += opengl32.lib GLU32.lib "$$PWD/../../../corto/Build/deps/lz4/build/cmake/Release/lz4.lib" \
+    "C:/Program Files/vcpkg/packages/glew_x64-windows/lib/glew32.lib" \
+    "./../../../corto/Build/Release/corto.lib"
+
 
 unix:INCLUDEPATH += /usr/local/lib
 unix:LIBS += -lGLEW -lGLU -lcorto

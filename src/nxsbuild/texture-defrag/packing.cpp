@@ -29,6 +29,8 @@
 #include <vcg/complex/algorithms/outline_support.h>
 #include <vcg/space/rasterized_outline2_packer.h>
 #include <wrap/qt/outline2_rasterizer.h>
+
+#include <Instrumentor.h>
 //#include <wrap/qt/Outline2ToQImage.h>
 
 namespace Defrag
@@ -42,10 +44,13 @@ namespace Defrag
 
         std::vector<Outline2f> outlines;
 
-        for (auto& c : charts) {
-            // Save the outline of the parameterization for this portion of the mesh
-            Outline2f outline = ExtractOutline2f(*c);
-            outlines.push_back(outline);
+        {
+            PROFILE_SCOPE("ExtractOutlines");
+            for (auto& c : charts) {
+                // Save the outline of the parameterization for this portion of the mesh
+                Outline2f outline = ExtractOutline2f(*c);
+                outlines.push_back(outline);
+            }
         }
 
         int packingSize = 4096;
@@ -103,6 +108,7 @@ namespace Defrag
 
         int n = 0;
         do {
+            PROFILE_SCOPE("VcgPackAttempt");
             transforms.clear();
             polyToContainer.clear();
             LOG_INFO << "Packing into grid of size " << containerVec[nc].X() << " " << containerVec[nc].Y();
@@ -117,42 +123,48 @@ namespace Defrag
 
         totPacked = charts.size();
 
-        if (n != 0) {
-            double textureScale = 1.0 / packingScale;
-            texszVec.push_back({(int) (containerVec[0].X() * textureScale), (int) (containerVec[0].Y() * textureScale)});
-            for (unsigned i = 0; i < outlines_iter.size(); ++i) {
-                if (polyToContainer[i] != -1) {
-                    ensure(polyToContainer[i] == 0); // We only use a single container
-                    int outlineInd = outlineIndex_iter[i];
-                    ensure(containerIndices[outlineInd] == -1);
-                    containerIndices[outlineInd] = nc;
-                    packingTransforms[outlineInd] = transforms[i];
+        {
+            PROFILE_SCOPE("TextureScaling");
+            if (n != 0) {
+                double textureScale = 1.0 / packingScale;
+                texszVec.push_back({(int) (containerVec[0].X() * textureScale), (int) (containerVec[0].Y() * textureScale)});
+                for (unsigned i = 0; i < outlines_iter.size(); ++i) {
+                    if (polyToContainer[i] != -1) {
+                        ensure(polyToContainer[i] == 0); // We only use a single container
+                        int outlineInd = outlineIndex_iter[i];
+                        ensure(containerIndices[outlineInd] == -1);
+                        containerIndices[outlineInd] = nc;
+                        packingTransforms[outlineInd] = transforms[i];
+                    }
+                    else
+                        std::cout << i << " was not packed" << std::endl;
                 }
-                else
-                    std::cout << i << " was not packed" << std::endl;
+            }
+
+            for (unsigned i = 0; i < charts.size(); ++i) {
+                for (auto fptr : charts[i]->fpVec) {
+                    Point2i gridSize = containerVec[0];
+                    for (int j = 0; j < fptr->VN(); ++j) {
+                        Point2d uv = fptr->WT(j).P();
+                        Point2f p = packingTransforms[i] * (Point2f(uv[0], uv[1]));
+
+                        p.X() /= (double) gridSize.X();
+                        p.Y() /= (double) gridSize.Y();
+
+                        fptr->V(j)->T().P() = Point2d(p.X(), p.Y());
+                        fptr->V(j)->T().N() = 0;
+                        fptr->WT(j).P() = fptr->V(j)->T().P();
+                        fptr->WT(j).N() = 0;
+                    }
+                }
             }
         }
 
-        for (unsigned i = 0; i < charts.size(); ++i) {
-            for (auto fptr : charts[i]->fpVec) {
-                Point2i gridSize = containerVec[0];
-                for (int j = 0; j < fptr->VN(); ++j) {
-                    Point2d uv = fptr->WT(j).P();
-                    Point2f p = packingTransforms[i] * (Point2f(uv[0], uv[1]));
-
-                    p.X() /= (double) gridSize.X();
-                    p.Y() /= (double) gridSize.Y();
-
-                    fptr->V(j)->T().P() = Point2d(p.X(), p.Y());
-                    fptr->V(j)->T().N() = 0;
-                    fptr->WT(j).P() = fptr->V(j)->T().P();
-                    fptr->WT(j).N() = 0;
-                }
-            }
+        {
+            PROFILE_SCOPE("UpdateParametrization");
+            for (auto c : charts)
+                c->ParameterizationChanged();
         }
-
-        for (auto c : charts)
-            c->ParameterizationChanged();
 
         return totPacked;
     }

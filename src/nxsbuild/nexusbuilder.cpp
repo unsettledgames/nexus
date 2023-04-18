@@ -34,24 +34,12 @@ for more details.
 // Nexus meshes
 #include "mesh.h"
 #include "tmesh.h"
-
-#include <texture-defrag/defrag_mesh.h>
-#include <texture-defrag/texture_object.h>
-#include <vcg/math/similarity2.h>
-#include <vcg/space/rect_packer.h>
-
-#include "../texture-defrag/src/texture_object.h"
-#include "../texture-defrag/src/texture_optimization.h"
-#include "../texture-defrag/src/packing.h"
-#include "../texture-defrag/src/utils.h"
-#include "../texture-defrag/src/mesh_attribute.h"
-#include "../texture-defrag/src/seam_remover.h"
-#include "../texture-defrag/src/texture_rendering.h"
+#include "textureextractor.h"
 
 #include <QApplication>
-#include <QOffscreenSurface>
-#include <QOpenGLContext>
 #include <iostream>
+
+#include <Instrumentor.h>
 
 #define NXS_FORMAT_VERSION  3
 
@@ -219,184 +207,6 @@ namespace nx
 
     };
 
-    QImage NexusBuilder::extractNodeTex(TMesh &mesh, std::vector<QImage>& toDefrag, std::unordered_map<int, int>& faceToPatchTexture,
-                                        int level, float &error, float &pixelXedge) {
-        // Set default parameters for defragmenter
-        Defrag::AlgoParameters ap;
-
-        ap.matchingThreshold = 2;
-        ap.boundaryTolerance = 0.2f;
-        ap.distortionTolerance = 0.5f;
-        ap.globalDistortionThreshold = 0.025f;
-        ap.UVBorderLengthReduction = 0.0;
-        ap.offsetFactor = 5;
-        ap.timelimit = 10;
-
-        // Create TextureObject
-        Defrag::TextureObjectHandle textureObject = std::make_shared<Defrag::TextureObject>();
-        for (auto& img : toDefrag)
-            textureObject->AddImage(img);
-
-        // Create Defrag::Mesh
-        Defrag::Mesh defragMesh;
-        // build mesh object
-        auto fi = tri::Allocator<Defrag::Mesh>::AddFaces(defragMesh, mesh.FN());
-        auto vi = tri::Allocator<Defrag::Mesh>::AddVertices(defragMesh, mesh.VN());
-
-        for (int i = 0; i < mesh.vert.size(); ++i) {
-            vi->P().X() = mesh.vert[i].P().X();
-            vi->P().Y() = mesh.vert[i].P().Y();
-            vi->P().Z() = mesh.vert[i].P().Z();
-            ++vi;
-        }
-
-        for (int i = 0; i < mesh.face.size(); ++i) {
-            defragMesh.face[i].node = mesh.face[i].node;
-
-            for (int k = 0; k < 3; ++k) {
-                fi->V(k) = &defragMesh.vert[mesh.face[i].cV(k) - &(*mesh.vert.begin())];
-                fi->WT(k).U() = mesh.face[i].cWT(k).U();
-                fi->WT(k).V() = mesh.face[i].cWT(k).V();
-
-                if (level != 0)
-                    fi->WT(k).N() = faceToPatchTexture[patches[nodes[mesh.face[i].node].first_patch].texture];
-            }
-            ++fi;
-        }
-
-        for (auto& f : defragMesh.face)
-            f.SetMesh();
-
-        // Clean mesh
-        tri::UpdateTopology<Defrag::Mesh>::FaceFace(defragMesh);
-        tri::UpdateNormal<Defrag::Mesh>::PerFaceNormalized(defragMesh);
-        tri::UpdateNormal<Defrag::Mesh>::PerVertexNormalized(defragMesh);
-
-        Defrag::ScaleTextureCoordinatesToImage(defragMesh, textureObject);
-
-        // Prepare mesh
-        int vndupIn;
-        Defrag::PrepareMesh(defragMesh, &vndupIn);
-        Defrag::ComputeWedgeTexCoordStorageAttribute(defragMesh);
-
-        // After this function is called, graph holds a reference to the textureObject
-        Defrag::GraphHandle graph = Defrag::ComputeGraph(defragMesh, textureObject);
-        std::map<Defrag::RegionID, bool> flipped;
-        for (auto& c : graph->charts)
-            flipped[c.first] = c.second->UVFlipped();
-
-        // ensure all charts are oriented coherently, and then store the wtc attribute
-        Defrag::ReorientCharts(graph);
-
-        std::map<Defrag::ChartHandle, int> anchorMap;
-        Defrag::AlgoStateHandle state = InitializeState(graph, ap);
-
-        Defrag::GreedyOptimization(graph, state, ap);
-        int vndupOut;
-        Defrag::Finalize(graph, &vndupOut);
-
-        // Rotate charts
-        for (auto entry : graph->charts) {
-            Defrag::ChartHandle chart = entry.second;
-            double zeroResamplingChartArea;
-            int anchor = Defrag::RotateChartForResampling(chart, state->changeSet, flipped, false, &zeroResamplingChartArea);
-            if (anchor != -1) {
-                anchorMap[chart] = anchor;
-            }
-        }
-
-        // Pack the atlas
-        // Discard zero-area charts
-        std::vector<Defrag::ChartHandle> chartsToPack;
-        for (auto& entry : graph->charts) {
-            if (entry.second->AreaUV() != 0) {
-                chartsToPack.push_back(entry.second);
-            } else {
-                for (auto fptr : entry.second->fpVec) {
-                    for (int j = 0; j < fptr->VN(); ++j) {
-                        fptr->V(j)->T().P() = Point2d::Zero();
-                        fptr->V(j)->T().N() = 0;
-                        fptr->WT(j).P() = Point2d::Zero();
-                        fptr->WT(j).N() = 0;
-                    }
-                }
-            }
-        }
-
-        std::vector<Defrag::TextureSize> texszVec;
-        int npacked = Defrag::Pack(chartsToPack, textureObject, texszVec);
-
-        // Some charts weren't packed
-        if (npacked < (int) chartsToPack.size()) {
-            cout << "Couldn't pack " << chartsToPack.size() - npacked << " charts" << endl;
-        }
-
-        cout << "Trim & shift" << endl;
-        // Trim & shift
-        Defrag::TrimTexture(defragMesh, texszVec, false);
-        Defrag::IntegerShift(defragMesh, chartsToPack, texszVec, anchorMap, flipped);
-
-        cout << "Init OpenGL" << endl;
-        // Create dummy OpenGL context
-        QOpenGLContext glContext;
-
-        QSurfaceFormat format;
-        format.setMajorVersion(3);
-        format.setMinorVersion(0);
-
-        glContext.setFormat(format);
-        glContext.create();
-
-        QOffscreenSurface surface;
-        surface.setFormat(format);
-        surface.create();
-
-        glContext.makeCurrent(&surface);
-        glContext.supportsThreadedOpenGL();
-
-        // init glew
-        glewExperimental = GL_TRUE;
-        auto glewInited = glewInit();
-
-        std::cout << "Rendering texture" << std::endl;
-        std::vector<std::shared_ptr<QImage>> newTextures = Defrag::RenderTexture(defragMesh, textureObject, texszVec, true,
-            Defrag::RenderMode::Linear);
-
-        std::cout << "Before deleting: " << defragMesh.vert.size() << " vs " << defragMesh.vn << "\n" <<
-                     defragMesh.face.size() << " vs " << defragMesh.fn << std::endl;
-
-        tri::Allocator<Defrag::Mesh>::CompactEveryVector(defragMesh);
-
-        assert(defragMesh.vn == defragMesh.vert.size() && defragMesh.vn == defragMesh.VN());
-        assert(defragMesh.fn == defragMesh.face.size() && defragMesh.fn == defragMesh.FN());
-
-        mesh.face.resize(defragMesh.FN());
-        mesh.fn = defragMesh.FN();
-        mesh.vert.resize(defragMesh.VN());
-        mesh.vn = defragMesh.VN();
-
-        for (int i = 0; i < defragMesh.VN(); ++i) {
-            mesh.vert[i].P().X() = defragMesh.vert[i].P().X();
-            mesh.vert[i].P().Y() = defragMesh.vert[i].P().Y();
-            mesh.vert[i].P().Z() = defragMesh.vert[i].P().Z();
-        }
-
-        for (int i = 0; i < defragMesh.FN(); ++i) {
-            for (int k = 0; k < 3; ++k) {
-                mesh.face[i].V(k) = &mesh.vert[defragMesh.face[i].cV(k) - &(*defragMesh.vert.begin())];
-                mesh.face[i].P(k) = defragMesh.face[i].P(k);
-                mesh.face[i].node = defragMesh.face[i].node;
-
-                mesh.face[i].WT(k).U() = defragMesh.face[i].cWT(k).U();
-                mesh.face[i].WT(k).V() = defragMesh.face[i].cWT(k).V();
-            }
-        }
-
-        std::cout << "Output textures " << newTextures.size() << std::endl;
-
-        return *newTextures[0];
-    }
-
     void NexusBuilder::createCloudLevel(KDTreeCloud *input, StreamCloud *output, int level) {
 
         for(uint block = 0; block < input->nBlocks(); block++) {
@@ -475,6 +285,8 @@ namespace nx
 
 
     void NexusBuilder::processBlock(KDTreeSoup *input, StreamSoup *output, uint block, int level) {
+        PROFILE_SCOPE("ProcessBlock");
+
         TMesh mesh;
         TMesh tmp;
 
@@ -485,6 +297,8 @@ namespace nx
 
         {
             QMutexLocker locker(&m_input);
+            PROFILE_SCOPE("LoadMesh");
+
             Soup soup = input->get(block); //soup is memory allocated by input, lock is needed.
             assert(soup.size() < (1<<16));
             if(soup.size() == 0) return;
@@ -516,27 +330,30 @@ namespace nx
 
             if(useNodeTex) {
                 std::unordered_map<int, int> faceToPatchTexture;
+                std::vector<QImage> texImages;
+                TextureExtractor texExtractor(patches, nodes, level, faceToPatchTexture);
+
                 mesh.createPatches(header.signature, node_patches);
 
                 // Load texture data
                 if (level == 0) {
-                    packedTexture = extractNodeTex(mesh, originalTextures, faceToPatchTexture, level, error, pixelXedge);
+                    faceToPatchTexture = {};
+                    texImages = originalTextures;
                 }
-                else
-                {
+                else {
                     // Get used textures
                     std::vector<int> toDefrag;
                     for (auto& patch : node_patches) {
+                        PROFILE_SCOPE("GetUsedTextures");
                         patch.texture = patches[nodes[patch.node].first_patch].texture;
 
                         faceToPatchTexture[patch.texture] = toDefrag.size();
                         toDefrag.push_back(patch.texture);
                     }
 
-                    std::vector<QImage> texImages(toDefrag.size());
                     {
                         QMutexLocker locker(&m_textures);
-
+                        PROFILE_SCOPE("GetTexureData");
                         for (uint32_t i=0; i<toDefrag.size(); i++)
                         {
                             Texture tex = textures[toDefrag[i]];
@@ -558,13 +375,9 @@ namespace nx
 
                         nodeTex.seek(nodeTex.size());
                     }
-                    packedTexture = extractNodeTex(mesh, texImages, faceToPatchTexture, level, error, pixelXedge);
                 }
 
-                /*
-                 * TODO:
-                 * - non crashare alla fine
-                 */
+                packedTexture = texExtractor.Extract(mesh, texImages, error, pixelXedge);
 
                 vcg::tri::Append<TMesh,TMesh>::MeshCopy(tmp, mesh);
                 for(int i = 0; i < tmp.face.size(); i++) {
@@ -608,7 +421,6 @@ namespace nx
                     writer.setProgressiveScanWrite(true);
     #endif
                     writer.write(packedTexture);
-                    assert(wrote);
 
                     quint64 size = pad(nodeTex.size());
                     nodeTex.resize(size);
@@ -1065,7 +877,6 @@ namespace nx
 
 
     void NexusBuilder::uniformNormals() {
-        cout << "Unifying normals\n" << endl;
         /*
         level 0: for each node in the lowest level:
                 load the neighboroughs
@@ -1089,9 +900,7 @@ namespace nx
             //box.Offset(box.Diag()/100);
             box.Offset(box.Diag()/10);
             vertices.clear();
-            std::cout << "Appending..." << std::endl;
             appendBorderVertices(t, t, vertices);
-            std::cout << "Appended vertices" << std::endl;
 
             bool last_level = (patches[target.first_patch].node == sink);
 
@@ -1103,7 +912,6 @@ namespace nx
                     if(!box.Collide(boxes[n].box)) continue;
 
                     appendBorderVertices(n, t, vertices);
-                    std::cout << "Appended vertices 2" << std::endl;
                 }
 
             } else { //again among childrens.
@@ -1112,7 +920,6 @@ namespace nx
                     uint n = patches[p].node;
 
                     appendBorderVertices(n, t, vertices);
-                    std::cout << "Appended vertices 2_" << n << std::endl;
                 }
             }
 
