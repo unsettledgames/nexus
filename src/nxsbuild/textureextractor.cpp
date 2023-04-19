@@ -25,7 +25,8 @@ using namespace std;
 
 namespace nx
 {
-    QImage TextureExtractor::Extract(TMesh& mesh, std::vector<QImage>& toDefrag, float &error, float &pixelXedge)
+    QImage TextureExtractor::Extract(TMesh& mesh, std::vector<QImage>& toDefrag, float &error, float &pixelXedge,
+                                     float& avgUsage)
     {
         Defrag::Mesh defragMesh;
         Defrag::AlgoParameters ap;
@@ -39,10 +40,13 @@ namespace nx
         ap.timelimit = 10;
 
         Defragment(toDefrag, mesh, defragMesh, ap);
+        std::cout << "Defragmented" << std::endl;
 
         auto texSizes = Pack(defragMesh);
+        std::cout << "Packed" << std::endl;
 
         QImage ret = Render(defragMesh, texSizes);
+        std::cout << "Rendered" << std::endl;
 
         {
             PROFILE_SCOPE("CopyBackMesh");
@@ -128,6 +132,8 @@ namespace nx
             areausage += (V2 - V0)^(V2 - V1)/2;
         }
 
+        //#define DEBUG_TRIANGLES
+#ifdef DEBUG_TRIANGLES
         QPainter painter(&ret);
         painter.setPen(QColor(255,0,255));
         std::cout << "Painter ok" << std::endl;
@@ -144,11 +150,12 @@ namespace nx
                 painter.drawLine(x0, y0, x1, y1);
             }
         }
-
+#endif
         sum += (100.0 * areausage) / ((double)ret.width() * ret.height());
         n++;
+        avgUsage = sum / n;
 
-        std::cout << "Curr average: " << sum / n << std::endl;
+        std::cout << "Curr average: " << avgUsage << std::endl;
 
         std::cout << "area usage: " << areausage << std::endl;
         std::cout << "texture area: " << ret.width() * ret.height() << std::endl;

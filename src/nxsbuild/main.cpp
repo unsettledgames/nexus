@@ -51,7 +51,6 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Init OpenGL" << std::endl;
 
-
     int node_size = 1<<15;
     float texel_weight =0.05; //relative weight of texels.
 
@@ -125,7 +124,6 @@ int main(int argc, char *argv[]) {
     opt.addSwitch('C', "colors", "save vertex colors", &colors);
     opt.addSwitch('c', "no colors", "do not store per vertex colors", &no_colors);
     opt.addSwitch('u', "no textures", "do not store textures and vertex texture coordinates", &no_texcoords);
-
 
     //other options
     opt.addOption('r', "ram", "max ram used (in MegaBytes), default 2000 (WARNING: just an approximation)", &ram_buffer);
@@ -274,6 +272,7 @@ int main(int argc, char *argv[]) {
         }
 
         NexusBuilder builder(components);
+        builder.setModelName(inputs[0]);
         builder.max_node_triangles = node_size;
         builder.skipSimplifyLevels = skiplevels;
         builder.setMaxMemory(max_memory);

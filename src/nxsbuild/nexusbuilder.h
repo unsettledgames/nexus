@@ -97,6 +97,11 @@ public:
             originalTextures.push_back(QImage(tex.filename));
     }
 
+    void setModelName(QString name)
+    {
+        modelName = name;
+    }
+
 	void setMaxMemory(quint64 m) {
 		max_memory = m;
 		chunks.setMaxMemory(m);
@@ -114,12 +119,8 @@ public:
 	QMutex m_builder;   //locks builders data (patches, etc.)
 	QMutex m_chunks;    //locks builder chunks (the cache)
 	QMutex m_atlas;     //locks atlas (the cache)
-     QMutex m_texsimply;     //locks the temporary data simplification structure for texture. (UGH)
-     QMutex m_textures;  //locks  texture temporary file
-    // TODO mutex for tex rendering
-
-
-
+    QMutex m_texsimply;     //locks the temporary data simplification structure for texture. (UGH)
+    QMutex m_textures;  //locks  texture temporary file
 
 	QFile file;
 
@@ -136,8 +137,9 @@ public:
 	quint64 input_pixels, output_pixels;
     nx::TexAtlas atlas;
 	QTemporaryFile nodeTex; //texure images for each node stored here.
-	quint64 max_memory;
-	int n_threads = 4;
+    QString modelName;
+    quint64 max_memory;
+    int n_threads = 1;
 
 	float scaling;
 	bool useNodeTex; //use node textures

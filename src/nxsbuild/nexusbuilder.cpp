@@ -156,9 +156,12 @@ namespace nx
             else tree->setAxesOrthogonal();
 
             tree->load(stream);
+            cout << "Loaded tree" << endl;
             stream->clear();
 
             createLevel(tree, stream, level);
+            cout << "Created level" << endl;
+
             level++;
             if(skipSimplifyLevels <= 0 && last_top_level_size != 0 && stream->size()/(float)last_top_level_size > 0.9f) {
                 cout << "Stream: " << stream->size() << " Last top level size: " << last_top_level_size << endl;
@@ -331,9 +334,11 @@ namespace nx
             if(useNodeTex) {
                 std::unordered_map<int, int> faceToPatchTexture;
                 std::vector<QImage> texImages;
-                TextureExtractor texExtractor(patches, nodes, level, faceToPatchTexture);
 
                 mesh.createPatches(header.signature, node_patches);
+                cout << "create patches" << endl;
+                TextureExtractor texExtractor(patches, nodes, level, faceToPatchTexture);
+                cout << "tex extractor" << endl;
 
                 // Load texture data
                 if (level == 0) {
@@ -350,18 +355,22 @@ namespace nx
                         faceToPatchTexture[patch.texture] = toDefrag.size();
                         toDefrag.push_back(patch.texture);
                     }
+                    cout << "Used textures" << endl;
 
                     {
-                        QMutexLocker locker(&m_textures);
                         PROFILE_SCOPE("GetTexureData");
+                        QMutexLocker locker(&m_textures);
+                        texImages.resize(toDefrag.size());
+
                         for (uint32_t i=0; i<toDefrag.size(); i++)
                         {
                             Texture tex = textures[toDefrag[i]];
                             uint64_t offset = tex.getBeginOffset();
                             uint64_t endOffset = (i == toDefrag.size() - 1) ? nodeTex.size() : textures[toDefrag[i]+1].getBeginOffset();
                             uint64_t dataSize = endOffset - offset;
-
                             nodeTex.seek(offset);
+
+                            cout << " seek  " << endl;
 
                             uint8_t* data;
                             auto bytes = nodeTex.read(dataSize);
@@ -372,12 +381,19 @@ namespace nx
                             if (texImages[i].format() != QImage::Format_RGB888)
                                 texImages[i].convertToFormat(QImage::Format_RGB888);
                         }
-
+                        cout << "texture data end" << endl;
                         nodeTex.seek(nodeTex.size());
                     }
                 }
 
-                packedTexture = texExtractor.Extract(mesh, texImages, error, pixelXedge);
+                float avgUsage;
+                packedTexture = texExtractor.Extract(mesh, texImages, error, pixelXedge, avgUsage);
+
+                std::ofstream avgFile((modelName.toStdString() + "defrag_usage.txt").c_str());
+                avgFile << avgUsage << endl;
+                avgFile.close();
+
+                cout << "tex extractor finished" << endl;
 
                 vcg::tri::Append<TMesh,TMesh>::MeshCopy(tmp, mesh);
                 for(int i = 0; i < tmp.face.size(); i++) {
@@ -386,13 +402,16 @@ namespace nx
                 }
 
                 tmp.splitSeams(header.signature);
+                cout << "Split seams" << endl;
                 mesh_size = pad(tmp.serializedSize(header.signature));
+                cout << "Serialized size" << endl;
 
                 buffer = new uchar[mesh_size];
                 tmp.serialize(buffer, header.signature, node_patches);
 
+                cout << "Serialize" << endl;
 
-                #define DEBUG_TEXTURES
+                //#define DEBUG_TEXTURES
             #ifdef DEBUG_TEXTURES
                 cout << "Saving test meshes and textures" << endl;
                 static int counter = 0;
@@ -496,8 +515,6 @@ namespace nx
 
             nodes.push_back(node);
             boxes.push_back(NodeBox(input, block));
-
-            std::cout << "Patches ok" << std::endl;
         }
 
 
@@ -526,10 +543,6 @@ namespace nx
     }
 
     void NexusBuilder::createMeshLevel(KDTreeSoup *input, StreamSoup *output, int level) {
-        atlas.buildLevel(level);
-        if(level > 0)
-            atlas.flush(level-1);
-
 
        QThreadPool pool;
         pool.setMaxThreadCount(n_threads);
@@ -846,8 +859,6 @@ namespace nx
 
     /* extracts vertices in origin which intersects destination box */
     void NexusBuilder::appendBorderVertices(uint32_t origin, uint32_t destination, std::vector<NVertex> &vertices) {
-        std::cout << "Origin node: " << origin << std::endl;
-        std::cout << "Destination node: " << destination << std::endl;
         Node &node = nodes[origin];
         uint32_t chunk = node.offset; //chunk index was stored here.
 
@@ -860,14 +871,10 @@ namespace nx
         size += header.signature.vertex.hasColors() * sizeof(vcg::Color4b);
 
         vcg::Point3s *normal = (vcg::Point3s *)(buffer + size * node.nvert);
-        std::cout << "N vertices per node: " << node.nvert << std::endl;
         uint16_t *face = (uint16_t *)(buffer + header.signature.vertex.size()*node.nvert);
 
         NodeBox &nodebox = boxes[origin];
-
-        std::cout << "Setup ok" << std::endl;
         vector<bool> border = nodebox.markBorders(node, point, face);
-        std::cout << "Marked borders" << std::endl;
 
         for(int i = 0; i < node.nvert; i++) {
             if(border[i])

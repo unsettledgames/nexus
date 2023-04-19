@@ -22,7 +22,7 @@ namespace nx
             m_Level(level), m_FaceTexToPatchTex(faceToPatchTexture), m_Patches(patches), m_Nodes(nodes){}
 
 
-        QImage Extract(TMesh& mesh, std::vector<QImage>& toDefrag, float &error, float &pixelXedge);
+        QImage Extract(TMesh& mesh, std::vector<QImage>& toDefrag, float &error, float &pixelXedge, float& avgUsage);
 
     private:
         void Defragment(const std::vector<QImage>& toDefrag, TMesh& mesh, Defrag::Mesh& defragMesh, Defrag::AlgoParameters& algoParams);
