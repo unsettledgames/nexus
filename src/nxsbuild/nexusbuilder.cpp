@@ -337,8 +337,6 @@ namespace nx
 
                 mesh.createPatches(header.signature, node_patches);
                 cout << "create patches" << endl;
-                TextureExtractor texExtractor(patches, nodes, level, faceToPatchTexture);
-                cout << "tex extractor" << endl;
 
                 // Load texture data
                 if (level == 0) {
@@ -387,7 +385,11 @@ namespace nx
                 }
 
                 float avgUsage;
-                packedTexture = texExtractor.Extract(mesh, texImages, error, pixelXedge, avgUsage);
+                TextureExtractor texExtractor(patches, nodes, level, faceToPatchTexture);
+                cout << "tex extractor" << endl;
+                packedTexture = texExtractor.Extract(
+                            mesh, texImages, error, pixelXedge, avgUsage, TextureExtractor::ParametrizationAlgo::Defrag,
+                            TextureExtractor::PackingAlgo::Defrag, TextureExtractor::RenderingAlgo::Defrag);
 
                 std::ofstream avgFile((modelName.toStdString() + "defrag_usage.txt").c_str());
                 avgFile << avgUsage << endl;
@@ -411,7 +413,7 @@ namespace nx
 
                 cout << "Serialize" << endl;
 
-                //#define DEBUG_TEXTURES
+                #define DEBUG_TEXTURES
             #ifdef DEBUG_TEXTURES
                 cout << "Saving test meshes and textures" << endl;
                 static int counter = 0;

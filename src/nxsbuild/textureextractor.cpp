@@ -25,10 +25,9 @@ using namespace std;
 
 namespace nx
 {
-    QImage TextureExtractor::Extract(TMesh& mesh, std::vector<QImage>& toDefrag, float &error, float &pixelXedge,
-                                     float& avgUsage)
+    QImage TextureExtractor::Extract(TMesh& mesh, std::vector<QImage>& textures, float &error, float &pixelXedge,
+                                     float& avgUsage, ParametrizationAlgo paramAlgo, PackingAlgo packingAlgo, RenderingAlgo renderingAlgo)
     {
-        Defrag::Mesh defragMesh;
         Defrag::AlgoParameters ap;
 
         ap.matchingThreshold = 2;
@@ -39,44 +38,14 @@ namespace nx
         ap.offsetFactor = 5;
         ap.timelimit = 10;
 
-        Defragment(toDefrag, mesh, defragMesh, ap);
+        Parametrize(textures, mesh, ap, paramAlgo);
         std::cout << "Defragmented" << std::endl;
 
-        auto texSizes = Pack(defragMesh);
+        auto texSizes = Pack(mesh, packingAlgo);
         std::cout << "Packed" << std::endl;
 
-        QImage ret = Render(defragMesh, texSizes);
+        QImage ret = Render(mesh, texSizes, renderingAlgo);
         std::cout << "Rendered" << std::endl;
-
-        {
-            PROFILE_SCOPE("CopyBackMesh");
-            tri::Allocator<Defrag::Mesh>::CompactEveryVector(defragMesh);
-
-            assert(defragMesh.vn == defragMesh.vert.size() && defragMesh.vn == defragMesh.VN());
-            assert(defragMesh.fn == defragMesh.face.size() && defragMesh.fn == defragMesh.FN());
-
-            mesh.face.resize(defragMesh.FN());
-            mesh.fn = defragMesh.FN();
-            mesh.vert.resize(defragMesh.VN());
-            mesh.vn = defragMesh.VN();
-
-            for (int i = 0; i < defragMesh.VN(); ++i) {
-                mesh.vert[i].P().X() = defragMesh.vert[i].P().X();
-                mesh.vert[i].P().Y() = defragMesh.vert[i].P().Y();
-                mesh.vert[i].P().Z() = defragMesh.vert[i].P().Z();
-            }
-
-            for (int i = 0; i < defragMesh.FN(); ++i) {
-                for (int k = 0; k < 3; ++k) {
-                    mesh.face[i].V(k) = &mesh.vert[defragMesh.face[i].cV(k) - &(*defragMesh.vert.begin())];
-                    mesh.face[i].P(k) = defragMesh.face[i].P(k);
-                    mesh.face[i].node = defragMesh.face[i].node;
-
-                    mesh.face[i].WT(k).U() = defragMesh.face[i].cWT(k).U();
-                    mesh.face[i].WT(k).V() = defragMesh.face[i].cWT(k).V();
-                }
-            }
-        }
 
         {
             PROFILE_SCOPE("ComputeError");
@@ -164,66 +133,43 @@ namespace nx
         return ret;
     }
 
-    void TextureExtractor::Defragment(const std::vector<QImage>& toDefrag, TMesh& mesh, Defrag::Mesh& defragMesh, Defrag::AlgoParameters& algoParams)
+    void TextureExtractor::Parametrize(const std::vector<QImage>& toDefrag, TMesh& mesh,
+                                       Defrag::AlgoParameters& algoParams, ParametrizationAlgo algo)
     {
         PROFILE_SCOPE("DefragmentTextures");
 
         // Create TextureObject
+        cout << "N textures: " << toDefrag.size() << endl;
         m_Textures = std::make_shared<Defrag::TextureObject>();
-        for (auto& img : toDefrag)
+        for (auto& img : toDefrag) {
             m_Textures->AddImage(img);
+        }
 
         // Create Defrag::Mesh
         {
             PROFILE_SCOPE("CopyMesh");
-            // build mesh object
-            auto fi = tri::Allocator<Defrag::Mesh>::AddFaces(defragMesh, mesh.FN());
-            auto vi = tri::Allocator<Defrag::Mesh>::AddVertices(defragMesh, mesh.VN());
-
-            for (int i = 0; i < mesh.vert.size(); ++i) {
-                vi->P().X() = mesh.vert[i].P().X();
-                vi->P().Y() = mesh.vert[i].P().Y();
-                vi->P().Z() = mesh.vert[i].P().Z();
-                ++vi;
-            }
-
-            for (int i = 0; i < mesh.face.size(); ++i) {
-                defragMesh.face[i].node = mesh.face[i].node;
-
-                for (int k = 0; k < 3; ++k) {
-                    fi->V(k) = &defragMesh.vert[mesh.face[i].cV(k) - &(*mesh.vert.begin())];
-                    fi->WT(k).U() = mesh.face[i].cWT(k).U();
-                    fi->WT(k).V() = mesh.face[i].cWT(k).V();
-
-                    if (m_Level != 0)
-                        fi->WT(k).N() = m_FaceTexToPatchTex[m_Patches[m_Nodes[mesh.face[i].node].first_patch].texture];
-                }
-                ++fi;
-            }
-
-            for (auto& f : defragMesh.face)
-                f.SetMesh();
+            NxsToDefragMesh(m_DefragMesh, mesh);
         }
 
         // Clean mesh
         {
             PROFILE_SCOPE("PrepareMesh");
-            tri::UpdateTopology<Defrag::Mesh>::FaceFace(defragMesh);
-            tri::UpdateNormal<Defrag::Mesh>::PerFaceNormalized(defragMesh);
-            tri::UpdateNormal<Defrag::Mesh>::PerVertexNormalized(defragMesh);
+            tri::UpdateTopology<Defrag::Mesh>::FaceFace(m_DefragMesh);
+            tri::UpdateNormal<Defrag::Mesh>::PerFaceNormalized(m_DefragMesh);
+            tri::UpdateNormal<Defrag::Mesh>::PerVertexNormalized(m_DefragMesh);
 
-            Defrag::ScaleTextureCoordinatesToImage(defragMesh, m_Textures);
+            Defrag::ScaleTextureCoordinatesToImage(m_DefragMesh, m_Textures);
 
             // Prepare mesh
             int vndupIn;
-            Defrag::PrepareMesh(defragMesh, &vndupIn);
-            Defrag::ComputeWedgeTexCoordStorageAttribute(defragMesh);
+            Defrag::PrepareMesh(m_DefragMesh, &vndupIn);
+            Defrag::ComputeWedgeTexCoordStorageAttribute(m_DefragMesh);
         }
 
         // After this function is called, graph holds a reference to the textureObject
         {
             PROFILE_SCOPE("CreateGrap");
-            m_Graph = Defrag::ComputeGraph(defragMesh, m_Textures);
+            m_Graph = Defrag::ComputeGraph(m_DefragMesh, m_Textures);
 
             for (auto& c : m_Graph->charts)
                 m_RegionFlipped[c.first] = c.second->UVFlipped();
@@ -251,10 +197,15 @@ namespace nx
                 }
             }
         }
+        //DefragToNxsMesh(mesh, defragMesh);
     }
 
-    std::vector<Defrag::TextureSize> TextureExtractor::Pack(Defrag::Mesh& defragMesh)
+    std::pair<int, int> TextureExtractor::Pack(TMesh& mesh, PackingAlgo algo)
     {
+        //NxsToDefragMesh(defragMesh, mesh);
+
+        cout << "Copied (Pack)" << endl;
+
         // Pack the atlas
         std::vector<Defrag::TextureSize> texszVec;
         std::vector<Defrag::ChartHandle> chartsToPack;
@@ -276,6 +227,7 @@ namespace nx
             }
 
             int npacked = Defrag::Pack(chartsToPack, m_Textures, texszVec);
+            std::cout << "pack end" << endl;
 
             // Some charts weren't packed
             if (npacked < (int) chartsToPack.size()) {
@@ -286,15 +238,21 @@ namespace nx
         {
             PROFILE_SCOPE("PolishTexture");
             // Trim & shift
-            Defrag::TrimTexture(defragMesh, texszVec, false);
-            Defrag::IntegerShift(defragMesh, chartsToPack, texszVec, m_AnchorMap, m_RegionFlipped);
+            Defrag::TrimTexture(m_DefragMesh, texszVec, false);
+            Defrag::IntegerShift(m_DefragMesh, chartsToPack, texszVec, m_AnchorMap, m_RegionFlipped);
         }
 
-        return texszVec;
+        cout << "Tex size vec: " << texszVec.size() << endl;
+
+        std::pair<int, int> ret = {texszVec[0].w, texszVec[0].h};
+        //DefragToNxsMesh(mesh, defragMesh);
+
+        return ret;
     }
 
-    QImage TextureExtractor::Render(Defrag::Mesh& defragMesh, std::vector<Defrag::TextureSize>& texszVec)
+    QImage TextureExtractor::Render(TMesh& mesh, std::pair<int, int>& texszVec, RenderingAlgo algo)
     {
+
         std::vector<std::shared_ptr<QImage>> newTextures;
         {
             PROFILE_SCOPE("RenderTexture");
@@ -322,9 +280,84 @@ namespace nx
             auto glewInited = glewInit();
 
             std::cout << "Rendering texture" << std::endl;
-            newTextures = Defrag::RenderTexture(defragMesh, m_Textures, texszVec, true, Defrag::RenderMode::Linear);
+            std::vector<Defrag::TextureSize> sizes = {{texszVec.first, texszVec.second}};
+            newTextures = Defrag::RenderTexture(m_DefragMesh, m_Textures, sizes, true, Defrag::RenderMode::Linear);
         }
 
+        DefragToNxsMesh(mesh, m_DefragMesh);
         return *newTextures[0];
+    }
+
+    void TextureExtractor::DefragToNxsMesh(TMesh& nxs, Defrag::Mesh& defrag)
+    {
+        tri::Allocator<Defrag::Mesh>::CompactEveryVector(defrag);
+
+        assert(defrag.vn == defrag.vert.size() && defrag.vn == defrag.VN());
+        assert(defrag.fn == defrag.face.size() && defrag.fn == defrag.FN());
+
+        nxs.face.resize(defrag.FN());
+        nxs.fn = defrag.FN();
+        nxs.vert.resize(defrag.VN());
+        nxs.vn = defrag.VN();
+
+        for (int i = 0; i < defrag.VN(); ++i) {
+            nxs.vert[i].P().X() = defrag.vert[i].P().X();
+            nxs.vert[i].P().Y() = defrag.vert[i].P().Y();
+            nxs.vert[i].P().Z() = defrag.vert[i].P().Z();
+
+            nxs.vert[i].SetFlags(defrag.vert[i].cFlags());
+        }
+
+        for (int i = 0; i < defrag.FN(); ++i) {
+            nxs.face[i].node = defrag.face[i].node;
+            for (int k = 0; k < 3; ++k) {
+                nxs.face[i].V(k) = &nxs.vert[defrag.face[i].cV(k) - &(*defrag.vert.begin())];
+                nxs.face[i].P(k) = defrag.face[i].P(k);
+                nxs.face[i].node = defrag.face[i].node;
+
+                nxs.face[i].WT(k).U() = defrag.face[i].cWT(k).U();
+                nxs.face[i].WT(k).V() = defrag.face[i].cWT(k).V();
+                nxs.face[i].WT(k).N() = defrag.face[i].cWT(k).N();
+
+                nxs.face[i].V(k)->T().P() = defrag.face[i].V(k)->T().P();
+                nxs.face[i].SetFlags(defrag.face[i].cFlags());
+            }
+        }
+    }
+
+    void TextureExtractor::NxsToDefragMesh(Defrag::Mesh& defrag, TMesh& nxs)
+    {
+        // build mesh object
+        auto fi = tri::Allocator<Defrag::Mesh>::AddFaces(defrag, nxs.FN());
+        auto vi = tri::Allocator<Defrag::Mesh>::AddVertices(defrag, nxs.VN());
+
+        for (int i = 0; i < nxs.vert.size(); ++i) {
+            vi->P().X() = nxs.vert[i].P().X();
+            vi->P().Y() = nxs.vert[i].P().Y();
+            vi->P().Z() = nxs.vert[i].P().Z();
+
+            vi->SetFlags(nxs.vert[i].cFlags());
+            ++vi;
+        }
+
+        for (int i = 0; i < nxs.face.size(); ++i) {
+            defrag.face[i].node = nxs.face[i].node;
+
+            for (int k = 0; k < 3; ++k) {
+                fi->V(k) = &defrag.vert[nxs.face[i].cV(k) - &(*nxs.vert.begin())];
+                fi->V(k)->T().P() = nxs.face[i].V(k)->T().P();
+
+                fi->WT(k).U() = nxs.face[i].cWT(k).U();
+                fi->WT(k).V() = nxs.face[i].cWT(k).V();
+                fi->SetFlags(nxs.face[i].cFlags());
+
+                if (m_Level != 0)
+                    fi->WT(k).N() = m_FaceTexToPatchTex[m_Patches[m_Nodes[nxs.face[i].node].first_patch].texture];
+            }
+            ++fi;
+        }
+
+        for (auto& f : defrag.face)
+            f.SetMesh();
     }
 }

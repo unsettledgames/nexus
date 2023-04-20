@@ -163,7 +163,7 @@ namespace Defrag
 
     double FaceGroup::OriginalAreaUV() const
     {
-        ensure(HasWedgeTexCoordStorageAttribute(mesh));
+        //ensure(HasWedgeTexCoordStorageAttribute(mesh));
         auto wtcsattr = GetWedgeTexCoordStorageAttribute(mesh);
 
         double doubleAreaUV = 0;

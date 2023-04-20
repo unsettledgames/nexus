@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
     int tex_quality(95);                //default jpg texture quality
     //QString decimation("quadric");      //simplification method
     int ram_buffer(2000);               //Mb of ram to use
-    int n_threads = 4;
+    int n_threads = 1;
     float scaling(0.5);                 //simplification ratio
     int skiplevels = 0;
     QString output("");                 //output file

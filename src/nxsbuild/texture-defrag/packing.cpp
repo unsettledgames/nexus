@@ -19,6 +19,7 @@
     along with TextureDefrag. If not, see <https://www.gnu.org/licenses/>.
 *******************************************************************************/
 
+#include <iostream>
 #include "packing.h"
 #include "texture_object.h"
 #include "mesh_graph.h"
@@ -33,6 +34,8 @@
 #include <Instrumentor.h>
 //#include <wrap/qt/Outline2ToQImage.h>
 
+using namespace std;
+
 namespace Defrag
 {
     typedef vcg::RasterizedOutline2Packer<float, QtOutline2Rasterizer> RasterizationBasedPacker;
@@ -43,7 +46,6 @@ namespace Defrag
         texszVec.clear();
 
         std::vector<Outline2f> outlines;
-
         {
             PROFILE_SCOPE("ExtractOutlines");
             for (auto& c : charts) {
@@ -52,6 +54,7 @@ namespace Defrag
                 outlines.push_back(outline);
             }
         }
+        cout << "outlines ok" << endl;
 
         int packingSize = 4096;
         std::vector<std::pair<double,double>> trs = textureObject->ComputeRelativeSizes();
@@ -61,6 +64,8 @@ namespace Defrag
             vcg::Point2i container(packingSize * rs.first, packingSize * rs.second);
             containerVec.push_back(container);
         }
+
+        cout << "container ok " << containerVec.size() << endl;
 
         // compute the scale factor for the packing
         int packingArea = 0;
@@ -181,6 +186,7 @@ namespace Defrag
 
     Outline2d ExtractOutline2d(FaceGroup& chart)
     {
+        cout << "outlines" << endl;
         //ensure(chart.numMerges == 0);
 
         std::vector<Outline2d> outline2Vec;
@@ -188,6 +194,7 @@ namespace Defrag
 
         for (auto fptr : chart.fpVec)
             fptr->ClearV();
+        std::cout << "cleared v" << std::endl;
 
         for (auto fptr : chart.fpVec) {
             for (int i = 0; i < 3; ++i) {
@@ -240,7 +247,6 @@ namespace Defrag
         } else {
             return outline2Vec[outlineIndex];
         }
-
     }
 
     void IntegerShift(Mesh& m, const std::vector<ChartHandle>& chartsToPack, const std::vector<TextureSize>& texszVec, const std::map<ChartHandle, int>& anchorMap, const std::map<RegionID, bool>& flippedInput)
