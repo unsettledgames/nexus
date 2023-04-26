@@ -80,7 +80,7 @@ namespace Defrag
         double packingScale = std::sqrt(packingArea / (double) textureArea);
 
         RasterizationBasedPacker::Parameters packingParams;
-        packingParams.costFunction = RasterizationBasedPacker::Parameters::LowestHorizon;
+        packingParams.costFunction = RasterizationBasedPacker::Parameters::MinWastedSpace;
         packingParams.doubleHorizon = false;
         packingParams.innerHorizon = true;
         //packingParams.permutations = false;
@@ -186,7 +186,6 @@ namespace Defrag
 
     Outline2d ExtractOutline2d(FaceGroup& chart)
     {
-        cout << "outlines" << endl;
         //ensure(chart.numMerges == 0);
 
         std::vector<Outline2d> outline2Vec;
@@ -194,7 +193,6 @@ namespace Defrag
 
         for (auto fptr : chart.fpVec)
             fptr->ClearV();
-        std::cout << "cleared v" << std::endl;
 
         for (auto fptr : chart.fpVec) {
             for (int i = 0; i < 3; ++i) {

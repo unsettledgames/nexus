@@ -106,6 +106,9 @@ namespace nx
     public:
         quint32 node;
         quint32 tex; //texture number where the wedge tex coords refer to.
+        int id = 0xffffffff;
+        int initialId = 0xffffffff;
+
         bool operator<(const TFace &t) const {
             return node < t.node;
         }

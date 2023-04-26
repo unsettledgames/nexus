@@ -19,6 +19,7 @@ for more details.
 #define NX_NEXUSBUILDER_H
 
 #include <vector>
+#include <queue>
 #include <unordered_map>
 
 #include <QString>
@@ -31,6 +32,7 @@ for more details.
 #include "../common/dag.h"
 #include "../common/virtualarray.h"
 #include "texpyramid.h"
+#include <texturerenderer.h>
 
 class QImage;
 
@@ -121,10 +123,12 @@ public:
 	QMutex m_atlas;     //locks atlas (the cache)
     QMutex m_texsimply;     //locks the temporary data simplification structure for texture. (UGH)
     QMutex m_textures;  //locks  texture temporary file
+    QMutex m_texturerendering; // used to add / remove tasks from the rendering queue
 
 	QFile file;
 
 	VirtualChunks chunks;
+    TextureRenderer texRenderer;
 	std::vector<NodeBox> boxes; //a box for each node
 
 	nx::Header header;

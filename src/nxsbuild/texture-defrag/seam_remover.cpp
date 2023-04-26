@@ -353,7 +353,7 @@ namespace Defrag
                     }
                     SeamData sd;
                     ComputeSeamData(sd, ws.first, graph, state);
-                    LOG_DEBUG << "  Chart ids are " << sd.a->id << " " << sd.b->id << " (areas = " << sd.a->AreaUV() << ", " << sd.b->AreaUV() << ")";
+                    //LOG_INFO << "  Chart ids are " << sd.a->id << " " << sd.b->id << " (areas = " << sd.a->AreaUV() << ", " << sd.b->AreaUV() << ")";
 
                     OffsetMap om = AlignAndMerge(ws.first, sd, state->transform[ws.first], params);
 
@@ -873,7 +873,9 @@ namespace Defrag
 
                 for (unsigned i = 0; i < faces.size(); ++i) {
                     if(faces[i]->id != sd.a->id && faces[i]->id != sd.b->id){
+                        LOG_INFO << "wrong ID: " << faces[i]->id;
                         LOG_ERR << "issue at face " << tri::Index(m, faces[i]);
+                        continue;
                     }
                     ensure(faces[i]->id == sd.a->id || faces[i]->id == sd.b->id);
 

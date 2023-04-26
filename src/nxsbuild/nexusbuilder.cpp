@@ -385,7 +385,7 @@ namespace nx
                 }
 
                 float avgUsage;
-                TextureExtractor texExtractor(patches, nodes, level, faceToPatchTexture);
+                TextureExtractor texExtractor(&texRenderer, patches, nodes, level, faceToPatchTexture);
                 cout << "tex extractor" << endl;
                 packedTexture = texExtractor.Extract(
                             mesh, texImages, error, pixelXedge, avgUsage, TextureExtractor::ParametrizationAlgo::Defrag,
@@ -397,6 +397,7 @@ namespace nx
 
                 cout << "tex extractor finished" << endl;
 
+                tri::Allocator<TMesh>::CompactEveryVector(mesh);
                 vcg::tri::Append<TMesh,TMesh>::MeshCopy(tmp, mesh);
                 for(int i = 0; i < tmp.face.size(); i++) {
                     tmp.face[i].node = mesh.face[i].node;
@@ -404,7 +405,6 @@ namespace nx
                 }
 
                 tmp.splitSeams(header.signature);
-                cout << "Split seams" << endl;
                 mesh_size = pad(tmp.serializedSize(header.signature));
                 cout << "Serialized size" << endl;
 
@@ -546,13 +546,16 @@ namespace nx
 
     void NexusBuilder::createMeshLevel(KDTreeSoup *input, StreamSoup *output, int level) {
 
-       QThreadPool pool;
+        QThreadPool pool;
         pool.setMaxThreadCount(n_threads);
 
         for(uint block = 0; block < input->nBlocks(); block++) {
             Worker *worker = new Worker(*this, input, output, block, level);
             pool.start(worker);
         }
+
+        texRenderer.Start(input->nBlocks());
+
         pool.waitForDone();
     }
 

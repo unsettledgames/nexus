@@ -1,4 +1,5 @@
 #include "textureextractor.h"
+#include "texturerenderer.h"
 
 #include <vcg/math/similarity2.h>
 #include <vcg/space/rect_packer.h>
@@ -14,10 +15,6 @@
 #include "tmesh.h"
 
 #include <iostream>
-#include <GL/glew.h>
-#include <QOpenGLContext>
-#include <QOffscreenSurface>
-#include <QPainter>
 
 #include <Instrumentor.h>
 
@@ -41,11 +38,18 @@ namespace nx
         Parametrize(textures, mesh, ap, paramAlgo);
         std::cout << "Defragmented" << std::endl;
 
-        auto texSizes = Pack(mesh, packingAlgo);
-        std::cout << "Packed" << std::endl;
+        m_TexSizes = Pack(mesh, packingAlgo);
 
-        QImage ret = Render(mesh, texSizes, renderingAlgo);
-        std::cout << "Rendered" << std::endl;
+        TextureRenderer::JobData data;
+        data.Extractor = this;
+        data.Finished = false;
+        data.OutMesh = &mesh;
+
+        m_Renderer->AddJob(&data);
+        while (m_FinalImage.isNull());
+        std::cout << "job ended" << std::endl;
+
+        QImage ret = m_FinalImage;
 
         {
             PROFILE_SCOPE("ComputeError");
@@ -202,30 +206,62 @@ namespace nx
 
     std::pair<int, int> TextureExtractor::Pack(TMesh& mesh, PackingAlgo algo)
     {
-        //NxsToDefragMesh(defragMesh, mesh);
+        std::vector<Defrag::ChartHandle> chartsToPack;
+        for (auto& entry : m_Graph->charts) {
+            if (entry.second->AreaUV() != 0) {
+                chartsToPack.push_back(entry.second);
+            } else {
+                for (auto fptr : entry.second->fpVec) {
+                    for (int j = 0; j < fptr->VN(); ++j) {
+                        fptr->V(j)->T().P() = Point2d::Zero();
+                        fptr->V(j)->T().N() = 0;
+                        fptr->WT(j).P() = Point2d::Zero();
+                        fptr->WT(j).N() = 0;
+                    }
+                }
+            }
+        }
 
+        /*
+        float H = 0;
+        for (auto chart : chartsToPack)
+            H += chart.UVBox().DimY();
+        H /= m_Graph->charts.size();
+
+        std::vector<uint32_t> classes(chartsToPack.size());
+        for (uint32_t i=0; i<chartsToPack.size(); i++)
+        {
+            float chartHeight =chartsToPack[i]->UVBox().DimY();
+            if (chartHeight < H)
+                classes[i] = std::ceil(std::log2(H / chartHeight)) - 1;
+            else
+                classes[i] = 0;
+        }
+
+        uint32_t xSign = 0;
+        std::set<uint32_t> xPos = {};
+        std::unordered_map<uint32_t, std::vector<uint32_t>> admissibleVerticals;
+
+        for (uint32_t i=0; i<classes.size(); i++)
+        {
+            for (uint32_t j=0; j<std::pow(2, classes[i])-1; j++)
+            {
+                admissibleVerticals[classes[j]]
+            }
+        }
+
+        for (uint32_t i=0; i<chartsToPack.size(); i++)
+        {
+
+        }
+
+        std::sort(classes.begin(), classes.end(), [](uint32_t a, uint32_t b){return a > b;});
+        */
         cout << "Copied (Pack)" << endl;
 
         // Pack the atlas
         std::vector<Defrag::TextureSize> texszVec;
-        std::vector<Defrag::ChartHandle> chartsToPack;
         {
-            PROFILE_SCOPE("AtlasPacking");
-            for (auto& entry : m_Graph->charts) {
-                if (entry.second->AreaUV() != 0) {
-                    chartsToPack.push_back(entry.second);
-                } else {
-                    for (auto fptr : entry.second->fpVec) {
-                        for (int j = 0; j < fptr->VN(); ++j) {
-                            fptr->V(j)->T().P() = Point2d::Zero();
-                            fptr->V(j)->T().N() = 0;
-                            fptr->WT(j).P() = Point2d::Zero();
-                            fptr->WT(j).N() = 0;
-                        }
-                    }
-                }
-            }
-
             int npacked = Defrag::Pack(chartsToPack, m_Textures, texszVec);
             std::cout << "pack end" << endl;
 
@@ -250,48 +286,25 @@ namespace nx
         return ret;
     }
 
-    QImage TextureExtractor::Render(TMesh& mesh, std::pair<int, int>& texszVec, RenderingAlgo algo)
+    void TextureExtractor::Render(TMesh* mesh)
     {
-
+        std::cout << "Rendering..." << std::endl;
         std::vector<std::shared_ptr<QImage>> newTextures;
         {
-            PROFILE_SCOPE("RenderTexture");
-            cout << "Init OpenGL" << endl;
-            static bool contextInited = false;
-            // Create dummy OpenGL context
-            QOpenGLContext glContext;
-
-            QSurfaceFormat format;
-            format.setMajorVersion(3);
-            format.setMinorVersion(0);
-
-            glContext.setFormat(format);
-            glContext.create();
-
-            QOffscreenSurface surface;
-            surface.setFormat(format);
-            surface.create();
-
-            glContext.makeCurrent(&surface);
-            glContext.supportsThreadedOpenGL();
-
-            // init glew
-            glewExperimental = GL_TRUE;
-            auto glewInited = glewInit();
-
-            std::cout << "Rendering texture" << std::endl;
-            std::vector<Defrag::TextureSize> sizes = {{texszVec.first, texszVec.second}};
+            std::vector<Defrag::TextureSize> sizes = {{m_TexSizes.first, m_TexSizes.second}};
+            std::cout << "Size: " << m_TexSizes.first << "," << m_TexSizes.second << endl;
             newTextures = Defrag::RenderTexture(m_DefragMesh, m_Textures, sizes, true, Defrag::RenderMode::Linear);
+            std::cout << "New texts" << endl;
         }
 
-        DefragToNxsMesh(mesh, m_DefragMesh);
-        return *newTextures[0];
+        DefragToNxsMesh(*mesh, m_DefragMesh);
+        m_FinalImage = QImage(*newTextures[0]);
+
+        std::cout << "Rendered" << std::endl;
     }
 
     void TextureExtractor::DefragToNxsMesh(TMesh& nxs, Defrag::Mesh& defrag)
     {
-        tri::Allocator<Defrag::Mesh>::CompactEveryVector(defrag);
-
         assert(defrag.vn == defrag.vert.size() && defrag.vn == defrag.VN());
         assert(defrag.fn == defrag.face.size() && defrag.fn == defrag.FN());
 
@@ -304,23 +317,22 @@ namespace nx
             nxs.vert[i].P().X() = defrag.vert[i].P().X();
             nxs.vert[i].P().Y() = defrag.vert[i].P().Y();
             nxs.vert[i].P().Z() = defrag.vert[i].P().Z();
-
-            nxs.vert[i].SetFlags(defrag.vert[i].cFlags());
         }
 
         for (int i = 0; i < defrag.FN(); ++i) {
             nxs.face[i].node = defrag.face[i].node;
+            nxs.face[i].SetFlags(defrag.face[i].cFlags());
+            nxs.face[i].id = defrag.face[i].id;
+
             for (int k = 0; k < 3; ++k) {
                 nxs.face[i].V(k) = &nxs.vert[defrag.face[i].cV(k) - &(*defrag.vert.begin())];
                 nxs.face[i].P(k) = defrag.face[i].P(k);
-                nxs.face[i].node = defrag.face[i].node;
 
                 nxs.face[i].WT(k).U() = defrag.face[i].cWT(k).U();
                 nxs.face[i].WT(k).V() = defrag.face[i].cWT(k).V();
-                nxs.face[i].WT(k).N() = defrag.face[i].cWT(k).N();
+                nxs.face[i].WT(k).N() = 0;
 
                 nxs.face[i].V(k)->T().P() = defrag.face[i].V(k)->T().P();
-                nxs.face[i].SetFlags(defrag.face[i].cFlags());
             }
         }
     }
@@ -336,7 +348,6 @@ namespace nx
             vi->P().Y() = nxs.vert[i].P().Y();
             vi->P().Z() = nxs.vert[i].P().Z();
 
-            vi->SetFlags(nxs.vert[i].cFlags());
             ++vi;
         }
 
@@ -349,7 +360,7 @@ namespace nx
 
                 fi->WT(k).U() = nxs.face[i].cWT(k).U();
                 fi->WT(k).V() = nxs.face[i].cWT(k).V();
-                fi->SetFlags(nxs.face[i].cFlags());
+                fi->WT(k).N() = 0;
 
                 if (m_Level != 0)
                     fi->WT(k).N() = m_FaceTexToPatchTex[m_Patches[m_Nodes[nxs.face[i].node].first_patch].texture];

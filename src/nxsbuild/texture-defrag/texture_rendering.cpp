@@ -152,6 +152,7 @@ namespace Defrag
                                           bool filter, RenderMode imode,
                                           int textureWidth, int textureHeight)
     {
+        std::cout << "received: " << textureWidth << "," << textureHeight << std::endl;
         auto WTCSh = GetWedgeTexCoordStorageAttribute(m);
 
         // sort the faces in increasing order of input texture unit
@@ -339,6 +340,7 @@ namespace Defrag
 
         Mirror(*textureImage);
 
+        std::cout << "Final size: " <<textureImage->width() << "," << textureImage->height() << std::endl;
         return textureImage;
     }
 }

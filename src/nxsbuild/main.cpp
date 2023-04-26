@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
 
     // we create a QCoreApplication just so that QT loads image IO plugins (for jpg and tiff loading)
     QApplication myUselessApp(argc, argv);
-    Q_UNUSED(myUselessApp);
+    //Q_UNUSED(myUselessApp);
 
     setlocale(LC_ALL, "C");
     QLocale::setDefault(QLocale::C);
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
     int tex_quality(95);                //default jpg texture quality
     //QString decimation("quadric");      //simplification method
     int ram_buffer(2000);               //Mb of ram to use
-    int n_threads = 1;
+    int n_threads = 24;
     float scaling(0.5);                 //simplification ratio
     int skiplevels = 0;
     QString output("");                 //output file

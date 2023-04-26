@@ -34,7 +34,9 @@ SOURCES += \
     plyloader.cpp \
     kdtree.cpp \
     mesh.cpp \
+    tetrispacker.cpp \
     textureextractor.cpp \
+    texturerenderer.cpp \
     tsploader.cpp \
     nexusbuilder.cpp \
     objloader.cpp \
@@ -73,7 +75,9 @@ HEADERS += \
     plyloader.h \
     partition.h \
     kdtree.h \
+    tetrispacker.h \
     textureextractor.h \
+    texturerenderer.h \
     trianglesoup.h \
     mesh.h \
     tsploader.h \

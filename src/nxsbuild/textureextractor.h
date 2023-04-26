@@ -13,6 +13,7 @@
 namespace nx
 {
     class TMesh;
+    class TextureRenderer;
 
     class TextureExtractor
     {
@@ -21,18 +22,18 @@ namespace nx
         enum class PackingAlgo{Defrag = 0, Tetris};
         enum class RenderingAlgo{Defrag = 0};
 
-        TextureExtractor(const std::vector<Patch> patches, const std::vector<Node> nodes,
-            uint32_t level, std::unordered_map<int, int>& faceToPatchTexture) :
+        TextureExtractor(TextureRenderer* texRenderer, const std::vector<Patch> patches, const std::vector<Node> nodes,
+            uint32_t level, std::unordered_map<int, int>& faceToPatchTexture) : m_Renderer(texRenderer),
             m_Level(level), m_FaceTexToPatchTex(faceToPatchTexture), m_Patches(patches), m_Nodes(nodes){}
 
         QImage Extract(TMesh& mesh, std::vector<QImage>& toDefrag, float &error, float &pixelXedge, float& avgUsage,
                        ParametrizationAlgo, PackingAlgo packingAlgo, RenderingAlgo renderingAlgo);
+        void Render(TMesh* mesh);
 
     private:
         void Parametrize(const std::vector<QImage>& toDefrag, TMesh& mesh,
                          Defrag::AlgoParameters& algoParams, ParametrizationAlgo algo);
         std::pair<int, int> Pack(TMesh& mesh, PackingAlgo algo);
-        QImage Render(TMesh& mesh, std::pair<int, int>& texSize, RenderingAlgo algo);
 
         void Defragment(TMesh& mesh);
 
@@ -53,10 +54,13 @@ namespace nx
         Defrag::GraphHandle m_Graph;
         Defrag::TextureObjectHandle m_Textures;
         Defrag::Mesh m_DefragMesh;
+        QImage m_FinalImage;
+        std::pair<int, int> m_TexSizes;
 
         std::map<Defrag::ChartHandle, int> m_AnchorMap;
         std::map<Defrag::RegionID, bool> m_RegionFlipped;
         std::unordered_map<int, int> m_FaceTexToPatchTex;
+        TextureRenderer* m_Renderer;
     };
 }
 
