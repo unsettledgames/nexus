@@ -9,6 +9,10 @@
 #include <GL/glew.h>
 #include <QOpenGLContext>
 #include <QOffscreenSurface>
+#include <QMutex>
+#include <QWaitCondition>
+
+#include <iostream>
 
 namespace nx
 {
@@ -20,23 +24,26 @@ namespace nx
     public:
         struct JobData
         {
+            QWaitCondition Condition;
+            QMutex ConditionMutex;
+
             TextureExtractor* Extractor;
             TMesh* OutMesh;
-            bool Finished = false;
         };
 
         TextureRenderer();
         TextureRenderer(const TextureRenderer& other) = default;
 
-        void Start(uint32_t toProcess);
+        bool Start(uint32_t toProcess);
 
         inline void AddJob(JobData* data)
         {
             {
+                std::cout << "[RENDERER] Adding rendering job" << std::endl;
                 QMutexLocker lock(&m_QueueMutex);
                 m_Jobs.push(data);
-                m_Condition.wakeOne();
             }
+            m_Condition.wakeAll();
         }
 
         inline uint32_t ProcessedCount() {return m_Processed;}

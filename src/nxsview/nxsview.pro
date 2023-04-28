@@ -24,7 +24,7 @@ win32:INCLUDEPATH += ../../../glew/include \
 
 win32:LIBS += opengl32.lib GLU32.lib "$$PWD/../../../corto/Build/deps/lz4/build/cmake/Release/lz4.lib" \
     "C:/Program Files/vcpkg/packages/glew_x64-windows/lib/glew32.lib" \
-    "./../../../corto/Build/Release/corto.lib"
+    "./../../../corto/Build/Debug/cortod.lib"
 
 
 unix:INCLUDEPATH += /usr/local/lib

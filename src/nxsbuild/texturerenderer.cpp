@@ -37,36 +37,34 @@ namespace nx
         auto glewInited = glewInit();
     }
 
-    void TextureRenderer::Start(uint32_t toProcess)
+    bool TextureRenderer::Start(uint32_t toProcess)
     {
+        if (m_Jobs.size() > 0)
+            std::cout << "FATAL: rendering jobs not finished" << std::endl;
+        m_Processed = 0;
+        std::cout << "[RENDERER] Tex renderer started" << std::endl;
         while (m_Processed < toProcess)
         {
-            TextureRenderer::JobData* job;
+
+            TextureRenderer::JobData* job = nullptr;
             {
                 QMutexLocker lock(&m_QueueMutex);
-                m_Condition.wait(&m_QueueMutex);
-            }
+                if (m_Jobs.size() == 0)
+                    m_Condition.wait(&m_QueueMutex);
 
-            {
-                QMutexLocker lock(&m_QueueMutex);
-                if (m_Jobs.size() > 0)
-                {
-                    job = m_Jobs.back();
-                    m_Jobs.pop();
-                }
+                job = m_Jobs.front();
+                m_Jobs.pop();
             }
-
-            m_GLContext.moveToThread(QThread::currentThread());
-            m_GLContext.makeCurrent(&m_GLSurface);
 
             job->Extractor->Render(job->OutMesh);
-            std::cout << "RENDERING FINISHED!" << std::endl;
-            job->Finished = true;
+            job->Condition.wakeAll();
 
+            std::cout << "[RENDERER] Finished!" << std::endl;
             m_Processed++;
+            std::cout << "Processed " << m_Processed << " out of " << toProcess << std::endl;
         }
-
-        m_Processed = 0;
+        std::cout << "finished everything" << std::endl;
+        return true;
     }
 }
 

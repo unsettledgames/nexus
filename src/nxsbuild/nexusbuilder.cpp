@@ -386,7 +386,6 @@ namespace nx
 
                 float avgUsage;
                 TextureExtractor texExtractor(&texRenderer, patches, nodes, level, faceToPatchTexture);
-                cout << "tex extractor" << endl;
                 packedTexture = texExtractor.Extract(
                             mesh, texImages, error, pixelXedge, avgUsage, TextureExtractor::ParametrizationAlgo::Defrag,
                             TextureExtractor::PackingAlgo::Defrag, TextureExtractor::RenderingAlgo::Defrag);
@@ -545,7 +544,6 @@ namespace nx
     }
 
     void NexusBuilder::createMeshLevel(KDTreeSoup *input, StreamSoup *output, int level) {
-
         QThreadPool pool;
         pool.setMaxThreadCount(n_threads);
 
@@ -554,6 +552,7 @@ namespace nx
             pool.start(worker);
         }
 
+        std::cout << "Starting new level" << std::endl;
         texRenderer.Start(input->nBlocks());
 
         pool.waitForDone();

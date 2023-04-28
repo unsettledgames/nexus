@@ -91,7 +91,6 @@ protected:
 	QTime time;
 	bool playing;
 
-	void init(QString file);
 	void initializeGL();
 	void resizeGL(int w, int h);
 	void setView(float znear, float zfar);
@@ -105,13 +104,13 @@ protected:
 	void mouseReleaseEvent(QMouseEvent *e);
 	void mouseDoubleClickEvent(QMouseEvent* e);
 	void keyReleaseEvent(QKeyEvent* e);
-	void keyPressEvent(QKeyEvent* e);
+    void keyPressEvent(QKeyEvent* e);
 
 private:
 	bool  hasToPick;  // has to pick during the next redraw.
 	float fov;
 	bool info;
-	vcg::Point2i pointToPick;
+    vcg::Point2i pointToPick;
 };
 
 

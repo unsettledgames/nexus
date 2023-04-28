@@ -26,15 +26,6 @@ for more details.
 
 #include <QDebug>
 
-#ifdef WIN32
-//microsoft compiler does not provide it.
-double log2( double n )
-{
-	// log(n)/log(2) is log2.
-	return log( n )* 3.32192809;
-}
-#endif
-
 extern int current_texture;
 
 using namespace nx;
@@ -109,9 +100,7 @@ void Renderer::nearFar(Nexus *nexus, float &neard, float &fard) {
 void Renderer::render(Nexus *nexus, bool get_view, int wait ) {
 	controller = nexus->controller;
 	if(!nexus->isReady()) return;
-	
 	if(get_view) getView();
-	
 	
 	locked.clear();
 	last_node = 0;
@@ -133,11 +122,8 @@ void Renderer::render(Nexus *nexus, bool get_view, int wait ) {
 		traverse(nexus);
 		
 		while(1) {
-			if(nexus->controller->isWaiting())
-				break;
-			
-			if(time.elapsed() > wait)
-				break;
+            if(nexus->controller->isWaiting()) break;
+            if(time.elapsed() > wait) break;
 			
 			mt::sleep_ms(10);
 		}
@@ -153,9 +139,7 @@ void Renderer::render(Nexus *nexus, bool get_view, int wait ) {
 	bool draw_triangles = sig.face.hasIndex() && (mode & TRIANGLES);
 	bool draw_textures = nexus->header.n_textures && (mode & TEXTURES);
 	bool draw_texcoords = sig.vertex.hasTextures()&& (mode & TEXTURES);
-	
-	
-	
+
 	if(draw_textures)
 		glEnable(GL_TEXTURE_2D);
 	if(draw_textures && ! draw_texcoords) {
@@ -170,45 +154,14 @@ void Renderer::render(Nexus *nexus, bool get_view, int wait ) {
 	glEnable(GL_COLOR_MATERIAL);
 	
 	glCheckError();
-	
-	
-#ifdef GL_COMPATIBILITY
-	glEnableClientState(GL_VERTEX_ARRAY);
-	if(draw_colors) glEnableClientState(GL_COLOR_ARRAY);
-	if(draw_normals) glEnableClientState(GL_NORMAL_ARRAY);
-	if(draw_texcoords) glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-	
-	renderSelected(nexus);
-	
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	if(draw_triangles) glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	
-	glDisableClientState(GL_VERTEX_ARRAY);
-	if(draw_normals) glDisableClientState(GL_NORMAL_ARRAY);
-	if(draw_colors) glDisableClientState(GL_COLOR_ARRAY);
-	if(draw_texcoords) glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-#endif
+
+    renderSelected(nexus);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    if(draw_triangles) glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	
 	glCheckError();
-	
-	
-	
-#if GL_ES || GL_CORE
-	glEnableVertexAttribArray(ATTRIB_VERTEX);
-	if(draw_colors) glEnableVertexAttribArray(ATTRIB_COLOR);
-	if(draw_normals) glEnableVertexAttribArray(ATTRIB_NORMAL);
-	
-	renderSelected(nexus);
-	
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	
-	if(draw_triangles) glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	
-	glDisableVertexAttribArray(ATTRIB_VERTEX);
-	if(draw_normals) glDisableVertexAttribArray(ATTRIB_NORMAL);
-	if(draw_colors) glDisableVertexAttribArray(ATTRIB_COLOR);
-#endif
-	
+
 	for(unsigned int i = 0; i < locked.size(); i++)
 		locked[i]->unlock();
 	locked.clear();
@@ -270,13 +223,13 @@ void Renderer::renderSelected(Nexus *nexus) {
 */
 	int GPU_loaded = 0;
 	uint32_t last_texture = 0xffffffff;
-	for(uint32_t i = 0; i <= last_node; i++) {
+    for(uint32_t i = 0; i <= last_node; i++)
+    {
 		if(!selected[i]) continue;
 		
 		Node &node = nexus->nodes[i];
 		
-		if(nexus->header.signature.face.hasIndex() && skipNode(i)) continue;
-		
+        if(nexus->header.signature.face.hasIndex() && skipNode(i)) continue;
 		stats.node_rendered++;
 		
 		//TODO cleanup frustum..
@@ -311,74 +264,29 @@ void Renderer::renderSelected(Nexus *nexus) {
 		}
 		
 		assert(data.vbo);
+        uint64_t start = 0;
 		
-		glBindBuffer(GL_ARRAY_BUFFER, data.vbo);
-		uint64_t start = 0;
+        glBindVertexArray(vao);
+        glBindBuffer(GL_ARRAY_BUFFER, data.vbo);
+        glVertexAttribPointer(ATTRIB_VERTEX, 3, GL_FLOAT, GL_TRUE, 0, (void *)start);
 
-#ifdef GL_COMPATIBILITY
-		glVertexPointer(3, GL_FLOAT, 0, (void *)start);
-		start += node.nvert*sig.vertex.attributes[VertexElement::COORD].size();
-		
-		if(draw_texcoords)
-			glTexCoordPointer(2, GL_FLOAT, 0, (void *)start);
-		if(sig.vertex.hasTextures())
-			start += node.nvert * sig.vertex.attributes[VertexElement::TEX].size();
-		
-        if (nexus->header.version <= 2) {
-            if(draw_normals)
-                glNormalPointer(GL_SHORT, 0, (void *)start);
-            if(sig.vertex.hasNormals())
-                start += node.nvert*sig.vertex.attributes[VertexElement::NORM].size();
+        start += node.nvert*sig.vertex.attributes[VertexElement::COORD].size();
 
-            if(draw_colors)
-                glColorPointer(4, GL_UNSIGNED_BYTE, 0, (void *)start);
-            if(sig.vertex.hasColors())
-                start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
-        }
-        else {
-            if(draw_colors)
-                glColorPointer(4, GL_UNSIGNED_BYTE, 0, (void *)start);
-            if(sig.vertex.hasColors())
-                start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
+        if(draw_normals) glVertexAttribPointer(ATTRIB_NORMAL, 3, GL_SHORT, GL_TRUE, 0, (void *)start);
+        if(sig.vertex.hasNormals()) start += node.nvert*sig.vertex.attributes[VertexElement::NORM].size();
 
-            if(draw_normals)
-                glNormalPointer(GL_SHORT, 0, (void *)start);
-            if(sig.vertex.hasNormals())
-                start += node.nvert*sig.vertex.attributes[VertexElement::NORM].size();
-        }
-		
-		
-#endif
-		
-#if GL_ES || GL_CORE
-		glVertexAttribPointer(ATTRIB_VERTEX, 3, GL_FLOAT, GL_TRUE, 0, (void *)start);
-		
-		start += node.nvert*sig.vertex.attributes[VertexElement::COORD].size();
-		
-		if(draw_normals)
-			glVertexAttribPointer(ATTRIB_NORMAL, 3, GL_SHORT, GL_TRUE, 0, (void *)start);
-		if(sig.vertex.hasNormals())
-			start += node.nvert*sig.vertex.attributes[VertexElement::NORM].size();
-		
-		if(draw_colors)
-			glVertexAttribPointer(ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, (void *)start);
-		if(sig.vertex.hasColors())
-			start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
-#endif
-		
+        if(draw_colors) glVertexAttribPointer(ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, (void *)start);
+        if(sig.vertex.hasColors()) start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
+
 		if(mode & PATCHES) {
 			vcg::Color4b  color;
 			color[2] = ((i % 11)*171)%63 + 63;
 			//color[1] = 255*log2((i+1))/log2(nexus->header.n_patches);
 			color[1] = ((i % 7)*57)%127 + 127;
 			color[0] = ((i % 16)*135)%127 + 127;
-			//metric.getError(node.sphere, node.error, visible); //here we must use the saturated radius.
-#ifdef GL_COMPATIBILITY
-			glColor3ub(color[0], color[1], color[2]);
-#endif
-#if GL_ES || GL_CORE
-			glVertexAttrib4f(ATTRIB_COLOR, color[0]/255.0f, color[1]/255.0f, color[2]/255.0f, 1.0f);
-#endif
+            //metric.getError(node.sphere, node.error, visible); //here we must use the saturated radius.
+            glVertexAttrib4f(ATTRIB_COLOR, color[0]/255.0f, color[1]/255.0f, color[2]/255.0f, 1.0f);
+
 		}
 		
 		glCheckError();
@@ -413,8 +321,7 @@ void Renderer::renderSelected(Nexus *nexus) {
 				if(k != last_patch)  //delay rendering
 					continue;
 			}
-			if(end > offset) {
-				
+            if(end > offset) {
 				//TODO GROUP TEXTURES ALSO
 				if(draw_textures) {
 					if(patch.texture != 0xffffffff) {
@@ -506,5 +413,22 @@ float Renderer::nodeError(uint32_t n, bool &visible) {
 	//vcg::Sphere3f sphere = node.tightSphere();
 	//return metric.getError(sphere, node.error, visible); //here we must use the saturated radius.
 }
+
+void Renderer::updateVao(nx::Signature sig)
+{
+    if (vao != 0)
+        glDeleteVertexArrays(1, &vao);
+
+    glCreateVertexArrays(1, &vao);
+
+    glBindVertexArray(vao);
+
+    // Enable attributes
+    glEnableVertexAttribArray(ATTRIB_VERTEX);
+    if(sig.vertex.hasColors()) glEnableVertexAttribArray(ATTRIB_COLOR);
+    if(sig.vertex.hasNormals()) glEnableVertexAttribArray(ATTRIB_NORMAL);
+    if(sig.vertex.hasTextures()) glEnableVertexAttribArray(ATTRIB_TEXTCOORD);
+}
+
 
 

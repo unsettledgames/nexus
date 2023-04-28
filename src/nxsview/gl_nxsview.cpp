@@ -63,21 +63,25 @@ void GLNxsview::checkForUpdate() {
 
 void GLNxsview::setTriangles(bool on) {
 	renderer.setMode(Renderer::TRIANGLES, on);
+    renderer.updateVao(scene.nodes[0].nexus->header.signature);
 	update();
 }
 
 void GLNxsview::setNormals(bool on) {
 	renderer.setMode(Renderer::NORMALS, on);
+    renderer.updateVao(scene.nodes[0].nexus->header.signature);
 	update();
 }
 
 void GLNxsview::setColors(bool on) {
 	renderer.setMode(Renderer::COLORS, on);
+    renderer.updateVao(scene.nodes[0].nexus->header.signature);
 	update();
 }
 
 void GLNxsview::setPatches(bool on) {
 	renderer.setMode(Renderer::PATCHES, on);
+    renderer.updateVao(scene.nodes[0].nexus->header.signature);
 	update();
 }
 
@@ -163,7 +167,7 @@ void GLNxsview::initializeGL() {
 	trackball.center = Point3f(0, 0, 0);
 	trackball.radius = 1;
 
-	glLoadIdentity();
+    glLoadIdentity();
 }
 
 void GLNxsview::resizeGL(int w, int h) {
@@ -176,8 +180,6 @@ void GLNxsview::resizeGL(int w, int h) {
 
 	glMatrixMode(GL_MODELVIEW);
 }
-
-
 
 void GLNxsview::setView(float znear, float zfar) {
 
@@ -304,10 +306,8 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
 	trackball.Apply();
 	glColor(color);
 
-
-	//if(extracting)
+    //if(extracting)
 	renderer.startFrame();
-
 
 	//COMPUTE NEAR and FAR
 	float znear = 1e20;

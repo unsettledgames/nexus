@@ -54,7 +54,6 @@ namespace Defrag
                 outlines.push_back(outline);
             }
         }
-        cout << "outlines ok" << endl;
 
         int packingSize = 4096;
         std::vector<std::pair<double,double>> trs = textureObject->ComputeRelativeSizes();
@@ -64,8 +63,6 @@ namespace Defrag
             vcg::Point2i container(packingSize * rs.first, packingSize * rs.second);
             containerVec.push_back(container);
         }
-
-        cout << "container ok " << containerVec.size() << endl;
 
         // compute the scale factor for the packing
         int packingArea = 0;

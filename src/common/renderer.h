@@ -84,6 +84,7 @@ public:
 	void setError(float error) { target_error = error; }
 	void setMaxPrimitives(uint32_t t) { max_rendered = t; }
 	void resetStats() { stats.resetAll(); }
+    void updateVao(nx::Signature sig);
 
 protected:
 	Controller *controller;
@@ -100,6 +101,9 @@ protected:
 	void renderSelected(Nexus *nexus);
 
 	std::vector<nx::Token *> locked; //to unlock at the end of the function
+
+private:
+    GLuint vao = 0;
 };
 
 

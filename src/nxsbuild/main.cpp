@@ -58,8 +58,8 @@ int main(int argc, char *argv[]) {
     float vertex_quantization = 0.0f;   //optionally quantize vertices position.
     int tex_quality(95);                //default jpg texture quality
     //QString decimation("quadric");      //simplification method
-    int ram_buffer(2000);               //Mb of ram to use
-    int n_threads = 24;
+    int ram_buffer(4000);               //Mb of ram to use
+    int n_threads = 2;
     float scaling(0.5);                 //simplification ratio
     int skiplevels = 0;
     QString output("");                 //output file

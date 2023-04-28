@@ -162,6 +162,7 @@ int main(int argc, char *argv[]) {
 	renderer.setMaxPrimitives((int)(draw.toDouble()*(1<<20)));
 	renderer.setError((float)error.toDouble());
 	renderer.setFps((float)fps.toDouble());
+    renderer.updateVao(scene.nodes[0].nexus->header.signature);
 
 	ui.mtri->setValue(draw.toDouble());
 	ui.error->setValue(error.toDouble());

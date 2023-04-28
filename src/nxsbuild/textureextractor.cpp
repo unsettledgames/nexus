@@ -42,12 +42,13 @@ namespace nx
 
         TextureRenderer::JobData data;
         data.Extractor = this;
-        data.Finished = false;
         data.OutMesh = &mesh;
 
         m_Renderer->AddJob(&data);
-        while (m_FinalImage.isNull());
-        std::cout << "job ended" << std::endl;
+        {
+            QMutexLocker lock(&data.ConditionMutex);
+            data.Condition.wait(&data.ConditionMutex);
+        }
 
         QImage ret = m_FinalImage;
 
@@ -129,10 +130,6 @@ namespace nx
         avgUsage = sum / n;
 
         std::cout << "Curr average: " << avgUsage << std::endl;
-
-        std::cout << "area usage: " << areausage << std::endl;
-        std::cout << "texture area: " << ret.width() * ret.height() << std::endl;
-        std::cout << "Percentage of used area: " << (100.0 * areausage) / ((double)ret.width() * ret.height()) << std::endl;
 
         return ret;
     }
