@@ -31,10 +31,12 @@ namespace nx {
 
 class NodeData {
 public:
-	NodeData(): memory(NULL), vbo(0), fbo(0) {}
+    NodeData(): memory(NULL), vbo(0), fbo(0), vao(0) {}
 	char *memory;
 	uint32_t vbo;
 	uint32_t fbo;
+    uint32_t vao;
+
 	vcg::Point3f *coords() { return (vcg::Point3f *)memory; }
 	vcg::Point2f *texCoords(Signature &/*sig*/, uint32_t nvert) {
 		char *m = memory;

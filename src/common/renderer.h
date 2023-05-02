@@ -83,8 +83,7 @@ public:
 	void setFps(float fps) { target_fps = fps; }
 	void setError(float error) { target_error = error; }
 	void setMaxPrimitives(uint32_t t) { max_rendered = t; }
-	void resetStats() { stats.resetAll(); }
-    void updateVao(nx::Signature sig);
+    void resetStats() { stats.resetAll(); }
 
 protected:
 	Controller *controller;

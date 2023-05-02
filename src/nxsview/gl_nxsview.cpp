@@ -62,26 +62,22 @@ void GLNxsview::checkForUpdate() {
 }
 
 void GLNxsview::setTriangles(bool on) {
-	renderer.setMode(Renderer::TRIANGLES, on);
-    renderer.updateVao(scene.nodes[0].nexus->header.signature);
+    renderer.setMode(Renderer::TRIANGLES, on);
 	update();
 }
 
 void GLNxsview::setNormals(bool on) {
-	renderer.setMode(Renderer::NORMALS, on);
-    renderer.updateVao(scene.nodes[0].nexus->header.signature);
+    renderer.setMode(Renderer::NORMALS, on);
 	update();
 }
 
 void GLNxsview::setColors(bool on) {
-	renderer.setMode(Renderer::COLORS, on);
-    renderer.updateVao(scene.nodes[0].nexus->header.signature);
+    renderer.setMode(Renderer::COLORS, on);
 	update();
 }
 
 void GLNxsview::setPatches(bool on) {
-	renderer.setMode(Renderer::PATCHES, on);
-    renderer.updateVao(scene.nodes[0].nexus->header.signature);
+    renderer.setMode(Renderer::PATCHES, on);
 	update();
 }
 
@@ -274,7 +270,6 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
 
 	glPushMatrix();
 
-
 	// ============== LIGHT TRACKBALL ==============
 	// Apply the trackball for the light direction
 	glPushMatrix();
@@ -338,14 +333,12 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
 		if(!node.nexus->header.signature.vertex.hasNormals())
 			glDisable(GL_LIGHTING);
 
-
 		glPushMatrix();
 		glMultMatrix(node.transform);
 
 		renderer.render(node.nexus, extracting);
 
 		glEnable(GL_LIGHTING);
-
 		glPopMatrix();
 	}
 

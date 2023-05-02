@@ -190,6 +190,9 @@ uint64_t Nexus::loadGpu(uint32_t n) {
 
 	glCheckError();
 
+    glGenVertexArrays(1, (GLuint*)&data.vao);
+    glBindVertexArray(data.vao);
+
 	glGenBuffers(1, (GLuint *)(&(data.vbo)));
 	glBindBuffer(GL_ARRAY_BUFFER, data.vbo);
 	glBufferData(GL_ARRAY_BUFFER, vertex_size, vertex_start, GL_STATIC_DRAW);
@@ -199,6 +202,45 @@ uint64_t Nexus::loadGpu(uint32_t n) {
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.fbo);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, face_size, face_start, GL_STATIC_DRAW);
 	}
+
+    uint64_t start = 0;
+    // Position
+    glEnableVertexAttribArray(0);
+    glCheckError();
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 0, (void*) start);
+    glCheckError();
+
+    start += node.nvert * sig.vertex.attributes[VertexElement::COORD].size();
+
+    if (header.signature.vertex.hasTextures()) {
+        glEnableVertexAttribArray(3);
+        glCheckError();
+
+        glVertexAttribPointer(3, 2, GL_FLOAT, GL_TRUE, 0, (void*) start);
+        glCheckError();
+
+        start += node.nvert * sig.vertex.attributes[VertexElement::TEX].size();
+    }
+    if (header.signature.vertex.hasColors()) {
+        glEnableVertexAttribArray(2);
+        glCheckError();
+
+        glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, (void*) start);
+        glCheckError();
+
+        start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
+    }
+    if (header.signature.vertex.hasNormals()) {
+        glEnableVertexAttribArray(1);
+        glCheckError();
+
+        glVertexAttribPointer(1, 3, GL_SHORT, GL_TRUE, 0, (void*) start);
+        glCheckError();
+
+        start += node.nvert * sig.vertex.attributes[VertexElement::NORM].size();
+    }
+    glCheckError();
 
 	int size = vertex_size + face_size;
 	if(header.n_textures) {
@@ -255,6 +297,8 @@ uint64_t Nexus::loadGpu(uint32_t n) {
 			
 			glCheckError();
 		}
+
+        glBindVertexArray(0);
 	}
 
 	return size;
