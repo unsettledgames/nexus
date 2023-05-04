@@ -144,7 +144,7 @@ void nx::Nexus::loadImageFromData(nx::TextureData& data, int t)
 	for (int i = 0; i < img.height(); i++) {
 		memcpy(mem, img.scanLine(i), linesize);
 		mem -= linesize;
-	}
+    }
 }
 void Nexus::loadIndex() {
 	NexusData::loadIndex();
@@ -174,134 +174,116 @@ bool isPowerOfTwo(unsigned int x) {
 	return (x & (x - 1)) == 0;
 }
 
-uint64_t Nexus::loadGpu(uint32_t n) {
-	NodeData &data = nodedata[n];
-	assert(data.memory);
-	assert(data.vbo == 0);
+uint64_t Nexus::loadGpu(uint32_t n, bool draw_normals, bool draw_colors, bool draw_textures) {
+    NodeData &data = nodedata[n];
+    assert(data.memory);
+    assert(data.vbo == 0);
 
-	Node &node = nodes[n];
+    Node &node = nodes[n];
 
-	Signature &sig = header.signature;
-	uint32_t vertex_size = node.nvert*sig.vertex.size();
-	uint32_t face_size = node.nface*sig.face.size();
+    Signature &sig = header.signature;
+    uint32_t vertex_size = node.nvert*sig.vertex.size();
+    uint32_t face_size = node.nface*sig.face.size();
 
-	char *vertex_start = data.memory;
-	char *face_start = vertex_start + vertex_size;
+    char *vertex_start = data.memory;
+    char *face_start = vertex_start + vertex_size;
 
-	glCheckError();
+    glCheckError();
 
     glGenVertexArrays(1, (GLuint*)&data.vao);
     glBindVertexArray(data.vao);
 
-	glGenBuffers(1, (GLuint *)(&(data.vbo)));
-	glBindBuffer(GL_ARRAY_BUFFER, data.vbo);
-	glBufferData(GL_ARRAY_BUFFER, vertex_size, vertex_start, GL_STATIC_DRAW);
+    glGenBuffers(1, (GLuint *)(&(data.vbo)));
+    glBindBuffer(GL_ARRAY_BUFFER, data.vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertex_size, vertex_start, GL_STATIC_DRAW);
 
-	if(node.nface) {
-		glGenBuffers(1, (GLuint *)(&(data.fbo)));
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.fbo);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, face_size, face_start, GL_STATIC_DRAW);
-	}
+    if(node.nface) {
+        glGenBuffers(1, (GLuint *)(&(data.fbo)));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.fbo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, face_size, face_start, GL_STATIC_DRAW);
+    }
 
     uint64_t start = 0;
     // Position
     glEnableVertexAttribArray(0);
-    glCheckError();
-
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 0, (void*) start);
-    glCheckError();
-
     start += node.nvert * sig.vertex.attributes[VertexElement::COORD].size();
 
-    if (header.signature.vertex.hasTextures()) {
+    if (header.signature.vertex.hasTextures() && draw_textures) {
         glEnableVertexAttribArray(3);
-        glCheckError();
-
         glVertexAttribPointer(3, 2, GL_FLOAT, GL_TRUE, 0, (void*) start);
-        glCheckError();
-
         start += node.nvert * sig.vertex.attributes[VertexElement::TEX].size();
     }
-    if (header.signature.vertex.hasColors()) {
+    if (header.signature.vertex.hasColors() && draw_colors) {
         glEnableVertexAttribArray(2);
-        glCheckError();
-
         glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, (void*) start);
-        glCheckError();
-
         start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
     }
-    if (header.signature.vertex.hasNormals()) {
+    if (header.signature.vertex.hasNormals() && draw_normals) {
         glEnableVertexAttribArray(1);
-        glCheckError();
-
         glVertexAttribPointer(1, 3, GL_SHORT, GL_TRUE, 0, (void*) start);
-        glCheckError();
-
         start += node.nvert * sig.vertex.attributes[VertexElement::NORM].size();
     }
+
     glCheckError();
 
-	int size = vertex_size + face_size;
-	if(header.n_textures) {
-		//be sure to load images
-		for(uint32_t p = node.first_patch; p < node.last_patch(); p++) {
-			Patch &patch = patches[p];
-			uint32_t t = patch.texture;
-			if(t == 0xffffffff) continue;
+    int size = vertex_size + face_size;
+    if(header.n_textures) {
+        //be sure to load images
+        for(uint32_t p = node.first_patch; p < node.last_patch(); p++) {
+            Patch &patch = patches[p];
+            uint32_t t = patch.texture;
+            if(t == 0xffffffff) continue;
 
-			TextureData &data = texturedata[t];
-			data.count_gpu++;
-			if(texturedata[t].tex) continue;
-			
-			glCheckError();
-			glGenTextures(1, &data.tex);
-			glBindTexture(GL_TEXTURE_2D, data.tex);
+            TextureData &data = texturedata[t];
+            data.count_gpu++;
+            if(texturedata[t].tex) continue;
 
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, data.width, data.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data.memory);
-			glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			if(isPowerOfTwo(data.width) && isPowerOfTwo(data.height)) {
-				glGenerateMipmap(GL_TEXTURE_2D);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-			} else
-				glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			
+            glCheckError();
+            glGenTextures(1, &data.tex);
+            glBindTexture(GL_TEXTURE_2D, data.tex);
 
-			//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-			//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, data.width, data.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data.memory);
+            glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            if(isPowerOfTwo(data.width) && isPowerOfTwo(data.height)) {
+                glGenerateMipmap(GL_TEXTURE_2D);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            } else
+                glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-			glCheckError();
-			size += data.width*data.height*3;
-			//careful with cache... might create problems to return different sizes in get drop and size
-			//glGenerateMipmap(GL_TEXTURE_2D);  //Generate mipmaps now!!!
+
+            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+            glCheckError();
+            size += data.width*data.height*3;
+            //careful with cache... might create problems to return different sizes in get drop and size
+            //glGenerateMipmap(GL_TEXTURE_2D);  //Generate mipmaps now!!!
 /*			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 4);
 
-			int red = 0xff0000ff;
-			glTexImage2D(GL_TEXTURE_2D, 1, GL_RGB, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, (char *)&red);
-			
-			int violet = 0x00ffffff;
-			
-			glTexImage2D(GL_TEXTURE_2D, 2, GL_RGB, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, (char *)&violet);
+            int red = 0xff0000ff;
+            glTexImage2D(GL_TEXTURE_2D, 1, GL_RGB, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, (char *)&red);
 
-			int blue = 0x0000ffff;
-			
-			glTexImage2D(GL_TEXTURE_2D, 3, GL_RGB, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, (char *)&blue);
+            int violet = 0x00ffffff;
 
-			int green = 0x00ff00ff;
-			
-			
-			glTexImage2D(GL_TEXTURE_2D, 4, GL_RGB, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, (char *)&green); */
-			
-			
+            glTexImage2D(GL_TEXTURE_2D, 2, GL_RGB, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, (char *)&violet);
 
-			
-			glCheckError();
-		}
+            int blue = 0x0000ffff;
+
+            glTexImage2D(GL_TEXTURE_2D, 3, GL_RGB, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, (char *)&blue);
+
+            int green = 0x00ff00ff;
+
+
+            glTexImage2D(GL_TEXTURE_2D, 4, GL_RGB, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, (char *)&green); */
+
+            glCheckError();
+        }
 
         glBindVertexArray(0);
-	}
+    }
 
-	return size;
+    return size;
 }
 
 uint64_t Nexus::dropGpu(uint32_t n) {

@@ -25,6 +25,7 @@ for more details.
 #include "controller.h"
 
 #include <QDebug>
+#include <QImage>
 
 extern int current_texture;
 
@@ -195,6 +196,8 @@ void Renderer::endFrame() {
 void Renderer::setMode(Renderer::Mode m, bool on) {
 	if(on) mode |= m;
 	else mode &= ~m;
+
+    recreateResources = true;
 }
 
 void Renderer::renderSelected(Nexus *nexus) {
@@ -242,7 +245,7 @@ void Renderer::renderSelected(Nexus *nexus) {
 			continue;
 		}
 		glCheckError();
-		if(0) { //DEBUG
+        if(1) { //DEBUG
 			vcg::Point3f c = sphere.Center();
 			float r = node.tight_radius; //sphere.Radius(); //DEBUG
 			
@@ -257,10 +260,15 @@ void Renderer::renderSelected(Nexus *nexus) {
 		NodeData &data = nexus->nodedata[i];
 		assert(data.memory);
 
-		if(!data.vbo) {
-			GPU_loaded++;
-			nexus->loadGpu(i);
-		}
+        if (recreateResources) {
+            GPU_loaded--;
+            nexus->dropGpu(i);
+            recreateResources = false;
+        }
+        if(!data.vbo) {
+            GPU_loaded++;
+            nexus->loadGpu(i, draw_normals, draw_colors, draw_texcoords | draw_textures);
+        }
 		
 		assert(data.vbo);
         assert(data.fbo);
@@ -269,7 +277,6 @@ void Renderer::renderSelected(Nexus *nexus) {
         uint64_t start = 0;
 
         glBindVertexArray(data.vao);
-        glBindBuffer(GL_ARRAY_BUFFER, data.vbo);
 
         /*
         glVertexAttribPointer(ATTRIB_VERTEX, 3, GL_FLOAT, GL_TRUE, 0, (void *)start);
@@ -313,9 +320,6 @@ void Renderer::renderSelected(Nexus *nexus) {
 			continue;
 		}
 		
-		if(draw_triangles)
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.fbo);
-		
 		uint32_t offset = 0;
 		uint32_t end = 0;
 		uint32_t last_patch = node.last_patch() - 1;
@@ -347,7 +351,7 @@ void Renderer::renderSelected(Nexus *nexus) {
 								glTexGenfv(GL_Q, GL_OBJECT_PLANE, &texture.matrix[12]);
 							}
 
-							TextureData &tdata = nexus->texturedata[patch.texture];
+                            TextureData &tdata = nexus->texturedata[patch.texture];
 							glBindTexture(GL_TEXTURE_2D, tdata.tex);
 							//glBindTexture(GL_TEXTURE_2D, 0);
                             last_texture = patch.texture;

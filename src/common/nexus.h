@@ -42,7 +42,7 @@ public:
 	bool isReady();
 	bool isStreaming() { return http_stream; }
 
-	uint64_t loadGpu(uint32_t node);
+    uint64_t loadGpu(uint32_t n, bool draw_normals, bool draw_colors, bool draw_textures);
 	uint64_t dropGpu(uint32_t node);
 
 	void initIndex();

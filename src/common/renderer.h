@@ -102,7 +102,7 @@ protected:
 	std::vector<nx::Token *> locked; //to unlock at the end of the function
 
 private:
-    GLuint vao = 0;
+    bool recreateResources = false;
 };
 
 
