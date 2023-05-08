@@ -64,15 +64,16 @@ public:
 
 	Stats stats;
 
-	Renderer():
-		mode(TRIANGLES | NORMALS | COLORS | TEXTURES),
-		cone_culling(false), frustum_culling(true), occlusion_culling(false),
-		target_error(3.0f), max_rendered(0), controller(NULL), frame(0) {}
+    Renderer():
+        mode(TRIANGLES | NORMALS | COLORS | TEXTURES),
+        cone_culling(false), frustum_culling(true), occlusion_culling(false),
+        target_error(3.0f), max_rendered(0), controller(NULL), frame(0) {}
 
+    void createShader();
 	void startFrame();
 	void getView(const float *proj = NULL, const float *modelview = NULL, const int *viewport = NULL);
 	void nearFar(Nexus *instance, float &near_distance, float &far_distance);
-	void render(Nexus *instance, bool getview = true, int wait = 0);
+    void render(Nexus *instance, vcg::Matrix44f& proj, vcg::Matrix44f& view, bool getview = true, int wait = 0);
 	void endFrame();
 
 	void setMode(Mode mode, bool on);
@@ -84,6 +85,12 @@ public:
 	void setError(float error) { target_error = error; }
 	void setMaxPrimitives(uint32_t t) { max_rendered = t; }
     void resetStats() { stats.resetAll(); }
+    void destroyGpuResources();
+
+    void setShader(const std::string& vertSrc, const std::string& fragSrc);
+
+private:
+    void createShader(const std::string& vertSrc, const std::string& fragSrc);
 
 protected:
 	Controller *controller;
@@ -103,6 +110,10 @@ protected:
 
 private:
     bool recreateResources = false;
+    GLuint shader;
+
+    float projection[16];
+    float viewModel[16];
 };
 
 

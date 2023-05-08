@@ -36,7 +36,7 @@ public:
 	Metric(): culling(true) {}
 	void getView(const float *proj = NULL, const float *modelview = NULL, const int *viewport = NULL) {
 		if(proj == NULL) {
-#ifndef GL_ES
+#ifndef GL_ES1
 			float p[16];
 			float m[16];
 			int v[4];

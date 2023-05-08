@@ -16,6 +16,7 @@ GNU General Public License (http://www.gnu.org/licenses/gpl.txt)
 for more details.
 */
 #include <vcg/space/color4.h>
+#include <vcg/math/camera.h>
 #include <wrap/system/multithreading/util.h>
 #include <wrap/system/time/clock.h>
 
@@ -25,12 +26,124 @@ for more details.
 #include "controller.h"
 
 #include <QDebug>
-#include <QImage>
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 extern int current_texture;
 
 using namespace nx;
 
+static struct _UniformLocations
+{
+    GLint MVP;
+
+    GLint UseNormals;
+    GLint UseColors;
+    GLint UseTextures;
+
+    GLint LightDir;
+    GLint Texture;
+} UniformLocations;
+
+const char* vertSrc = R"(
+    #version 410
+
+    layout(location = 0) in vec3 a_Position;
+    layout(location = 1) in vec3 a_Normal;
+    layout(location = 2) in vec4 a_Color;
+    layout(location = 3) in vec2 a_TexCoords;
+
+    layout(location = 0) out vec3 v_Normal;
+    layout(location = 1) out vec2 v_TexCoords;
+    layout(location = 2) out vec4 v_Color;
+
+    uniform mat4 u_MVP;
+
+    void main() {
+        gl_Position = u_MVP * vec4(a_Position, 1.0);
+
+        v_Normal = a_Normal;
+        v_TexCoords = a_TexCoords;
+        v_Color = a_Color;
+    }
+)";
+
+const char* fragSrc = R"(
+    #version 410
+
+    layout(location = 0) in vec3 v_Normal;
+    layout(location = 1) in vec2 v_TexCoords;
+    layout(location = 2) in vec4 v_Color;
+
+    layout(location = 0) out vec4 Color;
+
+    uniform int u_UseNormals;
+    uniform int u_UseColors;
+    uniform int u_UseTextures;
+
+    uniform vec3 u_LightDir;
+    uniform sampler2D u_Texture;
+
+    void main() {
+        vec3 finalColor = vec3(1.0);
+
+        float lighting = 1.0;
+        if (u_UseNormals == 1)
+            lighting = max(dot(normalize(v_Normal), normalize(-u_LightDir)), 0.0);
+
+        vec4 color = vec4(1.0);
+        if (u_UseColors == 1)
+            color *= v_Color;
+
+        if (u_UseTextures == 1)
+            color *= texture(u_Texture, v_TexCoords);
+
+        finalColor *= color.xyz;
+        Color = texture(u_Texture, v_TexCoords);// vec4(max(dot(normalize(v_Normal), normalize(-u_LightDir)), 0.0) * vec3(1.0), 1.0);
+    }
+)";
+
+/* Da spedire:
+ *  - Direzione luce
+ *  - Texture
+ *
+ */
+
+static void checkShaderCompileError(GLuint shader)
+{
+    GLint compiled;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+    if (compiled == GL_FALSE)
+    {
+        GLint maxLength = 0;
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
+
+        // The maxLength includes the NULL character
+        std::vector<GLchar> errorLog(maxLength);
+        glGetShaderInfoLog(shader, maxLength, &maxLength, &errorLog[0]);
+        std::cout << "Shader compile error: " << std::string(errorLog.data()) << std::endl;
+        assert(false);
+    }
+}
+
+static void checkShaderLinkError(GLuint program)
+{
+    GLint isLinked = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, (int*)&isLinked);
+    if (isLinked == GL_FALSE)
+    {
+        GLint maxLength = 0;
+        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+
+        // The maxLength includes the NULL character
+        std::vector<GLchar> infoLog(maxLength);
+        glGetProgramInfoLog(program, maxLength, &maxLength, &infoLog[0]);
+
+        // Use the infoLog as you see fit.
+        std::cout << "Shader program failed to link: " << std::string(infoLog.data()) << std::endl;
+        assert(false);
+    }
+}
 
 void Stats::resetAll() {
 	//memset(this, 0, sizeof(Stats)); //fast hack.
@@ -42,6 +155,40 @@ void Stats::resetAll() {
 void Stats::resetCurrent() {
 	instance_rendered = 0;
 	instance_error = 0.0f;
+}
+
+void Renderer::createShader() {
+    shader = glCreateProgram();
+
+    GLuint vertShader, fragShader;
+
+    vertShader = glCreateShader(GL_VERTEX_SHADER);
+    fragShader = glCreateShader(GL_FRAGMENT_SHADER);
+
+    glShaderSource(vertShader, 1, &vertSrc, nullptr);
+    glCompileShader(vertShader);
+    glAttachShader(shader, vertShader);
+    checkShaderCompileError(vertShader);
+
+    glShaderSource(fragShader, 1, &fragSrc, nullptr);
+    glCompileShader(fragShader);
+    glAttachShader(shader, fragShader);
+    checkShaderCompileError(fragShader);
+
+    glLinkProgram(shader);
+    checkShaderLinkError(shader);
+
+    glDeleteShader(vertShader);
+    glDeleteShader(fragShader);
+
+    UniformLocations.LightDir = glGetUniformLocation(shader, "u_LightDir");
+    UniformLocations.MVP = glGetUniformLocation(shader, "u_MVP");
+    UniformLocations.UseColors = glGetUniformLocation(shader, "u_UseColors");
+    UniformLocations.UseNormals = glGetUniformLocation(shader, "u_UseNormals");
+    UniformLocations.UseTextures = glGetUniformLocation(shader, "u_UseTextures");
+    UniformLocations.Texture = glGetUniformLocation(shader, "u_Texture");
+
+    glCheckError();
 }
 
 
@@ -98,11 +245,16 @@ void Renderer::nearFar(Nexus *nexus, float &neard, float &fard) {
 	if(fd > fard) fard = fd;
 }
 
-void Renderer::render(Nexus *nexus, bool get_view, int wait ) {
-	controller = nexus->controller;
-	if(!nexus->isReady()) return;
-	if(get_view) getView();
-	
+void Renderer::render(Nexus *nexus, vcg::Matrix44f& proj, vcg::Matrix44f& view, bool get_view, int wait) {
+    controller = nexus->controller;
+
+    vcg::Point3i viewport;
+    glGetIntegerv (GL_VIEWPORT, viewport.V());
+
+    if(!nexus->isReady()) return;
+    if(get_view)
+        getView(proj.transpose().V(), view.transpose().V(), viewport.V());
+
 	locked.clear();
 	last_node = 0;
 	
@@ -115,7 +267,7 @@ void Renderer::render(Nexus *nexus, bool get_view, int wait ) {
 			stats.fps = 0.1*fps + 0.9*stats.fps;
 		}
 	}
-	
+
 	stats.resetCurrent();
 	stats.time = time;
 	
@@ -129,6 +281,7 @@ void Renderer::render(Nexus *nexus, bool get_view, int wait ) {
 			mt::sleep_ms(10);
 		}
 	}
+
 	errors.clear();
 	errors.resize(nexus->header.n_nodes);
 	traverse(nexus);
@@ -148,19 +301,17 @@ void Renderer::render(Nexus *nexus, bool get_view, int wait ) {
 		glEnable(GL_TEXTURE_GEN_R);
 		glEnable(GL_TEXTURE_GEN_Q);
     }
-	
-    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-    glEnable(GL_COLOR_MATERIAL);
-	
-	glCheckError();
+
+    glUseProgram(shader);
+    glUniformMatrix4fv(UniformLocations.MVP, 1, GL_FALSE, (proj * view).transpose().V());
+    // [TODO] other uniforms
 
     renderSelected(nexus);
 
+    // Reset bindings
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     if(draw_triangles) glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-	
-	glCheckError();
 
 	for(unsigned int i = 0; i < locked.size(); i++)
 		locked[i]->unlock();
@@ -168,7 +319,6 @@ void Renderer::render(Nexus *nexus, bool get_view, int wait ) {
 	
 	stats.rendered += stats.instance_rendered;
 	if(stats.instance_error > stats.error) stats.error = stats.instance_error;
-	
 	
 	if(draw_textures)
 		glDisable(GL_TEXTURE_2D);
@@ -201,9 +351,6 @@ void Renderer::setMode(Renderer::Mode m, bool on) {
 }
 
 void Renderer::renderSelected(Nexus *nexus) {
-	
-	glCheckError();
-	
 	Signature &sig = nexus->header.signature;
 	bool draw_normals = sig.vertex.hasNormals() && (mode & NORMALS);
 	bool draw_colors = sig.vertex.hasColors() && (mode & COLORS ) && !(mode & PATCHES);
@@ -244,8 +391,8 @@ void Renderer::renderSelected(Nexus *nexus) {
 			stats.cone_culled++;
 			continue;
 		}
-		glCheckError();
-        if(1) { //DEBUG
+
+        if(0) { //DEBUG
 			vcg::Point3f c = sphere.Center();
 			float r = node.tight_radius; //sphere.Radius(); //DEBUG
 			
@@ -265,32 +412,17 @@ void Renderer::renderSelected(Nexus *nexus) {
             nexus->dropGpu(i);
             recreateResources = false;
         }
-        if(!data.vbo) {
-            GPU_loaded++;
+		if(!data.vbo) {
+			GPU_loaded++;
             nexus->loadGpu(i, draw_normals, draw_colors, draw_texcoords | draw_textures);
-        }
+		}
 		
 		assert(data.vbo);
         assert(data.fbo);
         assert(data.vao);
 
-        uint64_t start = 0;
-
         glBindVertexArray(data.vao);
-
-        /*
-        glVertexAttribPointer(ATTRIB_VERTEX, 3, GL_FLOAT, GL_TRUE, 0, (void *)start);
-        start += node.nvert*sig.vertex.attributes[VertexElement::COORD].size();
-
-        if (draw_texcoords) glVertexAttribPointer(ATTRIB_TEXTCOORD, 2, GL_FLOAT, GL_TRUE, 0, (void*) start);
-        if (sig.vertex.hasTextures()) start += node.nvert * sig.vertex.attributes[VertexElement::TEX].size();
-
-        if(draw_colors) glVertexAttribPointer(ATTRIB_COLOR, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, (void *)start);
-        if(sig.vertex.hasColors()) start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
-
-        if(draw_normals) glVertexAttribPointer(ATTRIB_NORMAL, 3, GL_SHORT, GL_TRUE, 0, (void *)start);
-        if(sig.vertex.hasNormals()) start += node.nvert*sig.vertex.attributes[VertexElement::NORM].size();
-        */
+        glBindBuffer(GL_ARRAY_BUFFER, data.vbo);
 
 		if(mode & PATCHES) {
 			vcg::Color4b  color;
@@ -319,6 +451,9 @@ void Renderer::renderSelected(Nexus *nexus) {
 			stats.instance_rendered += node.nvert;
 			continue;
 		}
+		
+		if(draw_triangles)
+			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, data.fbo);
 		
 		uint32_t offset = 0;
 		uint32_t end = 0;
@@ -351,7 +486,7 @@ void Renderer::renderSelected(Nexus *nexus) {
 								glTexGenfv(GL_Q, GL_OBJECT_PLANE, &texture.matrix[12]);
 							}
 
-                            TextureData &tdata = nexus->texturedata[patch.texture];
+							TextureData &tdata = nexus->texturedata[patch.texture];
 							glBindTexture(GL_TEXTURE_2D, tdata.tex);
 							//glBindTexture(GL_TEXTURE_2D, 0);
                             last_texture = patch.texture;

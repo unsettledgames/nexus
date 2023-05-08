@@ -159,6 +159,7 @@ int main(int argc, char *argv[]) {
 	controller.start();
 
 	nx::Renderer &renderer = ui.area->renderer;
+    renderer.createShader();
 	renderer.setMaxPrimitives((int)(draw.toDouble()*(1<<20)));
 	renderer.setError((float)error.toDouble());
     renderer.setFps((float)fps.toDouble());
