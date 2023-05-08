@@ -271,7 +271,8 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
     // ============== LIGHT TRACKBALL ==============
     // Apply the trackball for the light direction
     glPushMatrix();
-    trackball_light.GetView();
+    Matrix44f lightProj, lightView;
+    trackball_light.GetView(lightProj, lightView);
     trackball_light.Apply();
 
     static float lightPosF[]={0.0,0.0,1.0,0.0};
@@ -279,15 +280,18 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
     static float lightPosB[]={0.0,0.0,-1.0,0.0};
     glLightfv(GL_LIGHT1,GL_POSITION,lightPosB);
 
+    Point3f lightDir = Point3f(lightPosF) - Point3f(lightPosB);
+
     if (!default_trackball) {
         glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT);
-        glColor3f(0.8f,0.8f,0);
         glDisable(GL_LIGHTING);
         const int lineNum=3;
         glBegin(GL_LINES);
         for(int i=0;i<=lineNum;++i)
             for(int j=0;j<=lineNum;++j) {
+                glColor3f(1.0, 1.0, 0);
                 glVertex3f(-1.0f+i*2.0/lineNum,-1.0f+j*2.0/lineNum,-2);
+                glColor3f(0.5f,0.5f,0);
                 glVertex3f(-1.0f+i*2.0/lineNum,-1.0f+j*2.0/lineNum, 2);
             }
         glEnd();
@@ -295,6 +299,11 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
     }
     glPopMatrix();
     glColor(color);
+
+    Point4f light4(lightDir[0], lightDir[1], lightDir[2], 0.0f);
+    light4 = lightView * light4;
+    for (uint32_t i=0; i<3; i++)
+        lightDir[i] = light4[i];
 
 	renderer.startFrame();
 
@@ -338,7 +347,7 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
             glDisable(GL_LIGHTING);
 
         view = view * node.transform;
-        renderer.render(node.nexus, proj, view, extracting);
+        renderer.render(node.nexus, lightDir, proj, view, extracting);
 
         glEnable(GL_LIGHTING);
 	}

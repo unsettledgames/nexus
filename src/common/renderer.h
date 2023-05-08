@@ -73,7 +73,7 @@ public:
 	void startFrame();
 	void getView(const float *proj = NULL, const float *modelview = NULL, const int *viewport = NULL);
 	void nearFar(Nexus *instance, float &near_distance, float &far_distance);
-    void render(Nexus *instance, vcg::Matrix44f& proj, vcg::Matrix44f& view, bool getview = true, int wait = 0);
+    void render(Nexus *instance, vcg::Point3f& lightDir, vcg::Matrix44f& proj, vcg::Matrix44f& view, bool getview = true, int wait = 0);
 	void endFrame();
 
 	void setMode(Mode mode, bool on);

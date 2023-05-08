@@ -89,7 +89,7 @@ const char* fragSrc = R"(
 
         float lighting = 1.0;
         if (u_UseNormals == 1)
-            finalColor *= 0.2 + max(dot(normalize(v_Normal), normalize(-vec3(1.0))), 0.0);
+            finalColor *= 0.2 + max(dot(normalize(v_Normal), normalize(-u_LightDir)), 0.0);
 
         vec4 color = vec4(1.0);
         if (u_UseColors == 1)
@@ -98,7 +98,7 @@ const char* fragSrc = R"(
             color *= texture(u_Texture, v_TexCoords);
 
         finalColor *= color.xyz;
-        Color = vec4(finalColor, 1.0); // vec4(max(dot(normalize(v_Normal), normalize(-u_LightDir)), 0.0) * vec3(1.0), 1.0);
+        Color = vec4(finalColor, 1.0);
     }
 )";
 
@@ -238,7 +238,7 @@ void Renderer::nearFar(Nexus *nexus, float &neard, float &fard) {
 	if(fd > fard) fard = fd;
 }
 
-void Renderer::render(Nexus *nexus, vcg::Matrix44f& proj, vcg::Matrix44f& view, bool get_view, int wait) {
+void Renderer::render(Nexus *nexus, vcg::Point3f& lightDir, vcg::Matrix44f& proj, vcg::Matrix44f& view, bool get_view, int wait) {
     controller = nexus->controller;
 
     vcg::Point3i viewport;
@@ -300,8 +300,7 @@ void Renderer::render(Nexus *nexus, vcg::Matrix44f& proj, vcg::Matrix44f& view, 
     glUniform1i(UniformLocations.UseNormals, sig.vertex.hasNormals() && (mode & NORMALS));
     glUniform1i(UniformLocations.UseColors, sig.vertex.hasColors() && (mode & COLORS));
     glUniform1i(UniformLocations.UseTextures, sig.vertex.hasTextures() && (mode & TEXTURES));
-
-    //glUniform3f(UniformLocations.LightDir, 1, GL_FALSE, ligh)
+    glUniform3fv(UniformLocations.LightDir, 1, lightDir.V());
     glCheckError();
 
     /* Da spedire:
