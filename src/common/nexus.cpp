@@ -206,28 +206,30 @@ uint64_t Nexus::loadGpu(uint32_t n, bool draw_normals, bool draw_colors, bool dr
     uint64_t start = 0;
     // Position
     glEnableVertexAttribArray(0);
-    glCheckError();
-
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 0, (void*) start);
-    glCheckError();
-
     start += node.nvert * sig.vertex.attributes[VertexElement::COORD].size();
 
-    if (header.signature.vertex.hasTextures() && draw_textures) {
+    if (draw_textures) {
         glEnableVertexAttribArray(3);
         glVertexAttribPointer(3, 2, GL_FLOAT, GL_TRUE, 0, (void*) start);
-        start += node.nvert * sig.vertex.attributes[VertexElement::TEX].size();
     }
-    if (header.signature.vertex.hasColors() && draw_colors) {
+    if (header.signature.vertex.hasTextures())
+        start += node.nvert * sig.vertex.attributes[VertexElement::TEX].size();
+
+    if (draw_colors) {
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, (void*) start);
-        start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
     }
-    if (header.signature.vertex.hasNormals() && draw_normals) {
+    if (header.signature.vertex.hasColors())
+        start += node.nvert * sig.vertex.attributes[VertexElement::COLOR].size();
+
+    if (draw_normals) {
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 3, GL_SHORT, GL_TRUE, 0, (void*) start);
-        start += node.nvert * sig.vertex.attributes[VertexElement::NORM].size();
     }
+    if (header.signature.vertex.hasNormals())
+        start += node.nvert * sig.vertex.attributes[VertexElement::NORM].size();
+
     glCheckError();
 
 	int size = vertex_size + face_size;

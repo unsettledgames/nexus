@@ -109,7 +109,9 @@ protected:
 	std::vector<nx::Token *> locked; //to unlock at the end of the function
 
 private:
-    bool recreateResources = false;
+    // Saves the ids of the patches that have already been reloaded. If a patch isn't in this vector, then the
+    // rendering mode changed and it must be reuploaded to GPU.
+    std::vector<uint32_t> recreated;
     GLuint shader;
 
     float projection[16];

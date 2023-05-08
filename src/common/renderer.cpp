@@ -89,25 +89,18 @@ const char* fragSrc = R"(
 
         float lighting = 1.0;
         if (u_UseNormals == 1)
-            lighting = max(dot(normalize(v_Normal), normalize(-u_LightDir)), 0.0);
+            finalColor *= 0.2 + max(dot(normalize(v_Normal), normalize(-vec3(1.0))), 0.0);
 
         vec4 color = vec4(1.0);
         if (u_UseColors == 1)
             color *= v_Color;
-
         if (u_UseTextures == 1)
             color *= texture(u_Texture, v_TexCoords);
 
         finalColor *= color.xyz;
-        Color = texture(u_Texture, v_TexCoords);// vec4(max(dot(normalize(v_Normal), normalize(-u_LightDir)), 0.0) * vec3(1.0), 1.0);
+        Color = vec4(finalColor, 1.0); // vec4(max(dot(normalize(v_Normal), normalize(-u_LightDir)), 0.0) * vec3(1.0), 1.0);
     }
 )";
-
-/* Da spedire:
- *  - Direzione luce
- *  - Texture
- *
- */
 
 static void checkShaderCompileError(GLuint shader)
 {
@@ -304,6 +297,17 @@ void Renderer::render(Nexus *nexus, vcg::Matrix44f& proj, vcg::Matrix44f& view, 
 
     glUseProgram(shader);
     glUniformMatrix4fv(UniformLocations.MVP, 1, GL_FALSE, (proj * view).transpose().V());
+    glUniform1i(UniformLocations.UseNormals, sig.vertex.hasNormals() && (mode & NORMALS));
+    glUniform1i(UniformLocations.UseColors, sig.vertex.hasColors() && (mode & COLORS));
+    glUniform1i(UniformLocations.UseTextures, sig.vertex.hasTextures() && (mode & TEXTURES));
+
+    //glUniform3f(UniformLocations.LightDir, 1, GL_FALSE, ligh)
+    glCheckError();
+
+    /* Da spedire:
+     *  - Direzione luce
+     *  - Usage flags
+     */
     // [TODO] other uniforms
 
     renderSelected(nexus);
@@ -345,9 +349,9 @@ void Renderer::endFrame() {
 
 void Renderer::setMode(Renderer::Mode m, bool on) {
 	if(on) mode |= m;
-	else mode &= ~m;
+    else mode &= ~m;
 
-    recreateResources = true;
+    recreated.resize(0);
 }
 
 void Renderer::renderSelected(Nexus *nexus) {
@@ -407,15 +411,11 @@ void Renderer::renderSelected(Nexus *nexus) {
 		NodeData &data = nexus->nodedata[i];
 		assert(data.memory);
 
-        if (recreateResources) {
-            GPU_loaded--;
+        if (std::find(recreated.begin(), recreated.end(), i) == recreated.end()) {
             nexus->dropGpu(i);
-            recreateResources = false;
-        }
-		if(!data.vbo) {
-			GPU_loaded++;
             nexus->loadGpu(i, draw_normals, draw_colors, draw_texcoords | draw_textures);
-		}
+            recreated.push_back(i);
+        }
 		
 		assert(data.vbo);
         assert(data.fbo);
