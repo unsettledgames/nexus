@@ -280,7 +280,7 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
     static float lightPosB[]={0.0,0.0,-1.0,0.0};
     glLightfv(GL_LIGHT1,GL_POSITION,lightPosB);
 
-    Point3f lightDir = Point3f(lightPosF) - Point3f(lightPosB);
+    Point3f lightDir = Point3f(lightPosF);
 
     if (!default_trackball) {
         glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT);
@@ -302,8 +302,6 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
 
     Point4f light4(lightDir[0], lightDir[1], lightDir[2], 0.0f);
     light4 = lightView * light4;
-    for (uint32_t i=0; i<3; i++)
-        lightDir[i] = light4[i];
 
 	renderer.startFrame();
 
@@ -335,7 +333,6 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
 
     // Get correct projection
     static Matrix44f proj, view, trackProj;
-    //.Apply();
     trackball.GetView(trackProj, view);
     glGetFloatv(GL_PROJECTION_MATRIX, proj.V());
     proj.transposeInPlace();
@@ -346,8 +343,12 @@ void GLNxsview::paintEvent(QPaintEvent * /*event*/) {
         if(!node.nexus->header.signature.vertex.hasNormals())
             glDisable(GL_LIGHTING);
 
+        light4 = vcg::Inverse(view) * light4;
+        for (uint32_t i=0; i<3; i++)
+            lightDir[i] = light4[i];
+
         view = view * node.transform;
-        renderer.render(node.nexus, lightDir, proj, view, extracting);
+        renderer.render(node.nexus, lightDir, proj, view, node.transform, extracting);
 
         glEnable(GL_LIGHTING);
 	}

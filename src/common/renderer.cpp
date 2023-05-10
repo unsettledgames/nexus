@@ -36,6 +36,7 @@ using namespace nx;
 static struct _UniformLocations
 {
     GLint MVP;
+    GLint NormalMatrix;
 
     GLint UseNormals;
     GLint UseColors;
@@ -58,11 +59,12 @@ const char* vertSrc = R"(
     layout(location = 2) out vec4 v_Color;
 
     uniform mat4 u_MVP;
+    uniform mat3 u_NormalMatrix;
 
     void main() {
         gl_Position = u_MVP * vec4(a_Position, 1.0);
 
-        v_Normal = a_Normal;
+        v_Normal = u_NormalMatrix * a_Normal;
         v_TexCoords = a_TexCoords;
         v_Color = a_Color;
     }
@@ -176,6 +178,7 @@ void Renderer::createShader() {
 
     UniformLocations.LightDir = glGetUniformLocation(shader, "u_LightDir");
     UniformLocations.MVP = glGetUniformLocation(shader, "u_MVP");
+    UniformLocations.NormalMatrix = glGetUniformLocation(shader, "u_NormalMatrix");
     UniformLocations.UseColors = glGetUniformLocation(shader, "u_UseColors");
     UniformLocations.UseNormals = glGetUniformLocation(shader, "u_UseNormals");
     UniformLocations.UseTextures = glGetUniformLocation(shader, "u_UseTextures");
@@ -238,7 +241,7 @@ void Renderer::nearFar(Nexus *nexus, float &neard, float &fard) {
 	if(fd > fard) fard = fd;
 }
 
-void Renderer::render(Nexus *nexus, vcg::Point3f& lightDir, vcg::Matrix44f& proj, vcg::Matrix44f& view, bool get_view, int wait) {
+void Renderer::render(Nexus *nexus, vcg::Point3f& lightDir, vcg::Matrix44f& proj, vcg::Matrix44f& view, vcg::Matrix44f& transform, bool get_view, int wait) {
     controller = nexus->controller;
 
     vcg::Point3i viewport;
@@ -250,7 +253,7 @@ void Renderer::render(Nexus *nexus, vcg::Point3f& lightDir, vcg::Matrix44f& proj
 
 	locked.clear();
 	last_node = 0;
-	
+
 	mt::Clock time = mt::Clock::currentTime();
 	time.start();
 	if(stats.time.isValid()) {
@@ -263,7 +266,7 @@ void Renderer::render(Nexus *nexus, vcg::Point3f& lightDir, vcg::Matrix44f& proj
 
 	stats.resetCurrent();
 	stats.time = time;
-	
+
 	if(wait) {
 		traverse(nexus);
 		
@@ -295,19 +298,20 @@ void Renderer::render(Nexus *nexus, vcg::Point3f& lightDir, vcg::Matrix44f& proj
 		glEnable(GL_TEXTURE_GEN_Q);
     }
 
+    vcg::Matrix33f normalMatrix = vcg::Matrix33f::Identity();
+    vcg::Matrix44f glLikeTransform = transform.transpose();
+    for (uint32_t i=0; i<3; i++)
+        for (uint32_t j=0; j<3; j++)
+            normalMatrix[i][j] = glLikeTransform[i][j];
+
     glUseProgram(shader);
     glUniformMatrix4fv(UniformLocations.MVP, 1, GL_FALSE, (proj * view).transpose().V());
+    glUniformMatrix3fv(UniformLocations.NormalMatrix, 1, GL_FALSE, vcg::Inverse(normalMatrix).transpose()[0]);
     glUniform1i(UniformLocations.UseNormals, sig.vertex.hasNormals() && (mode & NORMALS));
     glUniform1i(UniformLocations.UseColors, sig.vertex.hasColors() && (mode & COLORS));
     glUniform1i(UniformLocations.UseTextures, sig.vertex.hasTextures() && (mode & TEXTURES));
     glUniform3fv(UniformLocations.LightDir, 1, lightDir.V());
     glCheckError();
-
-    /* Da spedire:
-     *  - Direzione luce
-     *  - Usage flags
-     */
-    // [TODO] other uniforms
 
     renderSelected(nexus);
 
